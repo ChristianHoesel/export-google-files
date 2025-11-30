@@ -34,14 +34,7 @@ jobs:
     - name: Run tests
       run: mvn test
 
-    - name: Upload JAR artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: jar-${{ github.run_number }}
-        path: target/google-photos-export-*-jar-with-dependencies.jar
-        retention-days: 90
-
-  # Build native packages with bundled JDK for each platform
+  # Build self-contained executables with bundled JDK for each platform
   package-windows:
     runs-on: windows-latest
     needs: build
@@ -62,26 +55,26 @@ jobs:
     - name: Build JAR
       run: mvn clean package -DskipTests
 
-    - name: Create native package with jpackage
+    - name: Create self-contained app with jpackage
       run: |
         jpackage --input target `
           --name "${{ env.APP_NAME }}" `
           --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar `
           --main-class ${{ env.MAIN_CLASS }} `
-          --type msi `
+          --type app-image `
           --app-version ${{ env.APP_VERSION }} `
           --vendor "Christian Hoesel" `
           --description "Export photos and videos from Google Photos" `
-          --dest target/installer `
-          --java-options "--enable-preview" `
-          --win-menu `
-          --win-shortcut
+          --dest target/app
 
-    - name: Upload Windows installer
+    - name: Create ZIP archive
+      run: Compress-Archive -Path "target/app/${{ env.APP_NAME }}" -DestinationPath "target/${{ env.APP_NAME }}-windows.zip"
+
+    - name: Upload Windows executable
       uses: actions/upload-artifact@v4
       with:
-        name: windows-installer-${{ github.run_number }}
-        path: target/installer/*.msi
+        name: windows-${{ github.run_number }}
+        path: target/${{ env.APP_NAME }}-windows.zip
         retention-days: 90
 
   package-macos:
@@ -104,24 +97,26 @@ jobs:
     - name: Build JAR
       run: mvn clean package -DskipTests
 
-    - name: Create native package with jpackage
+    - name: Create self-contained app with jpackage
       run: |
         jpackage --input target \
           --name "${{ env.APP_NAME }}" \
           --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
           --main-class ${{ env.MAIN_CLASS }} \
-          --type dmg \
+          --type app-image \
           --app-version ${{ env.APP_VERSION }} \
           --vendor "Christian Hoesel" \
           --description "Export photos and videos from Google Photos" \
-          --dest target/installer \
-          --java-options "--enable-preview"
+          --dest target/app
 
-    - name: Upload macOS installer
+    - name: Create ZIP archive
+      run: cd target/app && zip -r "../${{ env.APP_NAME }}-macos.zip" "${{ env.APP_NAME }}.app"
+
+    - name: Upload macOS executable
       uses: actions/upload-artifact@v4
       with:
-        name: macos-installer-${{ github.run_number }}
-        path: target/installer/*.dmg
+        name: macos-${{ github.run_number }}
+        path: target/${{ env.APP_NAME }}-macos.zip
         retention-days: 90
 
   package-linux:
@@ -141,31 +136,29 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    - name: Install fakeroot for deb packaging
-      run: sudo apt-get update && sudo apt-get install -y fakeroot
-
     - name: Build JAR
       run: mvn clean package -DskipTests
 
-    - name: Create native package with jpackage (deb)
+    - name: Create self-contained app with jpackage
       run: |
         jpackage --input target \
           --name "${{ env.APP_NAME }}" \
           --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
           --main-class ${{ env.MAIN_CLASS }} \
-          --type deb \
+          --type app-image \
           --app-version ${{ env.APP_VERSION }} \
           --vendor "Christian Hoesel" \
           --description "Export photos and videos from Google Photos" \
-          --dest target/installer \
-          --java-options "--enable-preview" \
-          --linux-shortcut
+          --dest target/app
 
-    - name: Upload Linux installer
+    - name: Create ZIP archive
+      run: cd target/app && zip -r "../${{ env.APP_NAME }}-linux.zip" "${{ env.APP_NAME }}"
+
+    - name: Upload Linux executable
       uses: actions/upload-artifact@v4
       with:
-        name: linux-installer-${{ github.run_number }}
-        path: target/installer/*.deb
+        name: linux-${{ github.run_number }}
+        path: target/${{ env.APP_NAME }}-linux.zip
         retention-days: 90
 
   # Cleanup old artifacts - keep only the latest 3 of each type
@@ -193,7 +186,7 @@ jobs:
           
           // Group artifacts by type prefix
           const artifactGroups = {};
-          const prefixes = ['jar-', 'windows-installer-', 'macos-installer-', 'linux-installer-'];
+          const prefixes = ['windows-', 'macos-', 'linux-'];
           
           for (const artifact of artifacts.data.artifacts) {
             for (const prefix of prefixes) {

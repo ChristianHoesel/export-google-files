@@ -10,7 +10,7 @@ Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Exportieren von Fo
 ## Funktionen
 
 - **Moderne JavaFX-GUI** mit ansprechendem Design
-- **Native Installer** für Windows (.msi), macOS (.dmg) und Linux (.deb) mit integriertem JDK
+- **Self-contained Executable** für Windows, macOS und Linux mit integriertem JDK - keine Installation erforderlich
 - **Export von Fotos und Videos** aus Google Photos
 - **Vollständige Metadaten-Erhaltung** inklusive:
   - EXIF-Daten (Kamera, Objektiv, Einstellungen)
@@ -33,23 +33,23 @@ Die Anwendung bietet eine moderne, benutzerfreundliche Oberfläche:
 - **Export-Konfiguration** - Intuitive Einstellungen mit Datumspicker
 - **Fortschrittsanzeige** - Live-Status während des Exports
 
-## Installation
+## Download & Verwendung
 
-### Option 1: Native Installer (empfohlen)
+### Portable Executable (empfohlen)
 
-Laden Sie den passenden Installer für Ihr Betriebssystem herunter - **keine Java-Installation erforderlich!**
+Laden Sie die passende ZIP-Datei für Ihr Betriebssystem herunter - **keine Installation oder Java erforderlich!**
 
-| Betriebssystem | Download |
-|----------------|----------|
-| Windows | `GooglePhotosExporter-1.0.0.msi` |
-| macOS | `GooglePhotosExporter-1.0.0.dmg` |
-| Linux (Debian/Ubuntu) | `GooglePhotosExporter-1.0.0.deb` |
+| Betriebssystem | Download | Verwendung |
+|----------------|----------|------------|
+| Windows | `GooglePhotosExporter-windows.zip` | Entpacken → `GooglePhotosExporter.exe` starten |
+| macOS | `GooglePhotosExporter-macos.zip` | Entpacken → `GooglePhotosExporter.app` starten |
+| Linux | `GooglePhotosExporter-linux.zip` | Entpacken → `./GooglePhotosExporter` ausführen |
 
-Die Installer enthalten das Java Runtime Environment (JDK 25) und können direkt installiert werden.
+Die ZIP-Dateien enthalten das komplette JDK 25 - einfach entpacken und starten!
 
 **Download:** Gehen Sie zu [Actions](../../actions) → Wählen Sie den neuesten erfolgreichen Build → Download Artifacts
 
-### Option 2: Aus Quellcode bauen
+### Aus Quellcode bauen
 
 #### Voraussetzungen
 
@@ -89,26 +89,21 @@ cd export-google-files
 mvn clean package
 ```
 
-### Native Installer erstellen
+### Self-contained Executable erstellen
 
 ```bash
-# Windows (.msi)
-jpackage --input target --name GooglePhotosExporter \
-  --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
-  --main-class de.christianhoesel.googlephotos.ui.GooglePhotosApp \
-  --type msi --dest target/installer
+# Erst JAR bauen
+mvn clean package
 
-# macOS (.dmg)
+# Self-contained App erstellen (auf jeweiligem Betriebssystem ausführen)
 jpackage --input target --name GooglePhotosExporter \
   --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
   --main-class de.christianhoesel.googlephotos.ui.GooglePhotosApp \
-  --type dmg --dest target/installer
+  --type app-image --dest target/app
 
-# Linux (.deb)
-jpackage --input target --name GooglePhotosExporter \
-  --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
-  --main-class de.christianhoesel.googlephotos.ui.GooglePhotosApp \
-  --type deb --dest target/installer
+# Optional: ZIP erstellen
+# Windows: Compress-Archive -Path "target/app/GooglePhotosExporter" -DestinationPath "GooglePhotosExporter-windows.zip"
+# macOS/Linux: cd target/app && zip -r ../GooglePhotosExporter.zip GooglePhotosExporter*
 ```
 
 ### Credentials platzieren
