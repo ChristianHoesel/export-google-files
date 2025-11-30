@@ -304,9 +304,22 @@ public class GooglePhotosService {
                 photoMetadata.setApertureFNumber(photo.getApertureFNumber());
                 photoMetadata.setIsoEquivalent(photo.getIsoEquivalent());
                 if (photo.hasExposureTime()) {
-                    photoMetadata.setExposureTime(String.format("%.4fs", 
-                            photo.getExposureTime().getSeconds() + 
-                            photo.getExposureTime().getNanos() / 1_000_000_000.0));
+                    // Convert Duration to total seconds as a double
+                    // Duration has seconds and nanos (0-999,999,999) fields
+                    long seconds = photo.getExposureTime().getSeconds();
+                    int nanos = photo.getExposureTime().getNanos();
+                    double totalSeconds = seconds + (nanos / 1_000_000_000.0);
+                    
+                    // Format exposure time appropriately based on duration
+                    if (totalSeconds >= 1.0) {
+                        photoMetadata.setExposureTime(String.format("%.1fs", totalSeconds));
+                    } else if (totalSeconds > 0) {
+                        // Express as fraction for short exposures (e.g., 1/250s)
+                        double reciprocal = 1.0 / totalSeconds;
+                        photoMetadata.setExposureTime(String.format("1/%.0fs", reciprocal));
+                    } else {
+                        photoMetadata.setExposureTime("0s");
+                    }
                 }
             }
             

@@ -152,21 +152,45 @@ public class ExportService {
         return Paths.get(pathBuilder.toString());
     }
 
+    private static final String[] ALLOWED_DOWNLOAD_HOSTS = {
+        "lh3.googleusercontent.com",
+        "lh4.googleusercontent.com",
+        "lh5.googleusercontent.com",
+        "lh6.googleusercontent.com",
+        "video.googleusercontent.com"
+    };
+    
     /**
      * Downloads a file from a URL.
+     * Only allows downloads from trusted Google domains.
      * 
      * @param urlString The URL to download from
      * @param outputPath The path to save the file to
-     * @throws IOException if download fails
+     * @throws IOException if download fails or URL is not from trusted domain
      */
     private void downloadFile(String urlString, Path outputPath) throws IOException {
         HttpURLConnection connection = null;
         try {
             URI uri = URI.create(urlString);
+            
+            // Validate that URL is from trusted Google domains
+            String host = uri.getHost();
+            if (host == null || !isAllowedHost(host)) {
+                throw new IOException("Download URL is not from a trusted Google domain: " + host);
+            }
+            
+            // Only allow HTTPS for security
+            String scheme = uri.getScheme();
+            if (!"https".equalsIgnoreCase(scheme)) {
+                throw new IOException("Only HTTPS URLs are allowed for downloads");
+            }
+            
             connection = (HttpURLConnection) uri.toURL().openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(30000);
             connection.setReadTimeout(60000);
+            // Disable automatic redirects to prevent redirect-based attacks
+            connection.setInstanceFollowRedirects(false);
             
             int responseCode = connection.getResponseCode();
             if (responseCode != HttpURLConnection.HTTP_OK) {
@@ -186,6 +210,21 @@ public class ExportService {
                 connection.disconnect();
             }
         }
+    }
+    
+    /**
+     * Checks if the host is in the list of allowed download hosts.
+     * 
+     * @param host The host to check
+     * @return true if the host is allowed
+     */
+    private boolean isAllowedHost(String host) {
+        for (String allowed : ALLOWED_DOWNLOAD_HOSTS) {
+            if (host.equalsIgnoreCase(allowed) || host.endsWith("." + allowed)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -240,6 +279,7 @@ public class ExportService {
 
     /**
      * Sanitizes a filename by removing or replacing invalid characters.
+     * Prevents directory traversal attacks and invalid filenames.
      * 
      * @param filename The original filename
      * @return Sanitized filename
@@ -248,8 +288,51 @@ public class ExportService {
         if (filename == null || filename.isEmpty()) {
             return "unnamed_" + System.currentTimeMillis();
         }
-        // Replace invalid characters with underscore
-        return filename.replaceAll("[\\\\/:*?\"<>|]", "_");
+        
+        String sanitized = filename;
+        
+        // Remove directory traversal sequences
+        sanitized = sanitized.replace("..", "_");
+        
+        // Replace path separators and invalid characters
+        sanitized = sanitized.replaceAll("[\\\\/:*?\"<>|]", "_");
+        
+        // Remove leading dots (hidden files on Unix, potential issues)
+        while (sanitized.startsWith(".")) {
+            sanitized = sanitized.substring(1);
+        }
+        
+        // Check for Windows reserved names (case-insensitive)
+        String baseName = sanitized;
+        int dotIndex = sanitized.lastIndexOf('.');
+        if (dotIndex > 0) {
+            baseName = sanitized.substring(0, dotIndex);
+        }
+        String[] reservedNames = {"CON", "PRN", "AUX", "NUL", 
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
+        for (String reserved : reservedNames) {
+            if (baseName.equalsIgnoreCase(reserved)) {
+                sanitized = "_" + sanitized;
+                break;
+            }
+        }
+        
+        // Ensure reasonable filename length (max 200 characters to leave room for paths)
+        if (sanitized.length() > 200) {
+            String extension = "";
+            if (dotIndex > 0 && dotIndex < sanitized.length() - 1) {
+                extension = sanitized.substring(dotIndex);
+            }
+            sanitized = sanitized.substring(0, 200 - extension.length()) + extension;
+        }
+        
+        // If empty after sanitization, use default name
+        if (sanitized.isEmpty()) {
+            return "unnamed_" + System.currentTimeMillis();
+        }
+        
+        return sanitized;
     }
 
     /**

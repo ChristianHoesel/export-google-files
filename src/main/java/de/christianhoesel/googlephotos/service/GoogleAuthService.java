@@ -78,8 +78,9 @@ public class GoogleAuthService {
                 .setAccessType("offline")
                 .build();
         
+        // Use port 0 for dynamic port allocation to avoid conflicts
         LocalServerReceiver receiver = new LocalServerReceiver.Builder()
-                .setPort(8888)
+                .setPort(0)
                 .build();
         
         Credential credential = new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");

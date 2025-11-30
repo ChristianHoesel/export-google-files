@@ -51,13 +51,6 @@
             <version>1.7.3</version>
         </dependency>
 
-        <!-- Apache Commons for metadata handling -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-imaging</artifactId>
-            <version>1.0-alpha3</version>
-        </dependency>
-
         <!-- Metadata Extractor for EXIF -->
         <dependency>
             <groupId>com.drewnoakes</groupId>
