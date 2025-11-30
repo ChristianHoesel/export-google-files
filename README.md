@@ -5,10 +5,12 @@ Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Exportieren von Fo
 ![Java Version](https://img.shields.io/badge/Java-25-orange)
 ![JavaFX](https://img.shields.io/badge/JavaFX-21-blue)
 ![License](https://img.shields.io/badge/License-Apache%202.0-green)
+![Build](https://github.com/ChristianHoesel/export-google-files/actions/workflows/ci.yml/badge.svg)
 
 ## Funktionen
 
 - **Moderne JavaFX-GUI** mit ansprechendem Design
+- **Native Installer** für Windows (.msi), macOS (.dmg) und Linux (.deb) mit integriertem JDK
 - **Export von Fotos und Videos** aus Google Photos
 - **Vollständige Metadaten-Erhaltung** inklusive:
   - EXIF-Daten (Kamera, Objektiv, Einstellungen)
@@ -31,23 +33,37 @@ Die Anwendung bietet eine moderne, benutzerfreundliche Oberfläche:
 - **Export-Konfiguration** - Intuitive Einstellungen mit Datumspicker
 - **Fortschrittsanzeige** - Live-Status während des Exports
 
-## Voraussetzungen
+## Installation
+
+### Option 1: Native Installer (empfohlen)
+
+Laden Sie den passenden Installer für Ihr Betriebssystem herunter - **keine Java-Installation erforderlich!**
+
+| Betriebssystem | Download |
+|----------------|----------|
+| Windows | `GooglePhotosExporter-1.0.0.msi` |
+| macOS | `GooglePhotosExporter-1.0.0.dmg` |
+| Linux (Debian/Ubuntu) | `GooglePhotosExporter-1.0.0.deb` |
+
+Die Installer enthalten das Java Runtime Environment (JDK 25) und können direkt installiert werden.
+
+**Download:** Gehen Sie zu [Actions](../../actions) → Wählen Sie den neuesten erfolgreichen Build → Download Artifacts
+
+### Option 2: Aus Quellcode bauen
+
+#### Voraussetzungen
 
 - **Java 25** oder höher
 - Maven 3.6 oder höher
-- Google Cloud Projekt mit aktivierter Photos Library API
-- OAuth 2.0 Credentials (credentials.json)
 
-## Installation
-
-### 1. Repository klonen
+#### Repository klonen
 
 ```bash
 git clone https://github.com/ChristianHoesel/export-google-files.git
 cd export-google-files
 ```
 
-### 2. Google Cloud Projekt einrichten
+## Google Cloud Projekt einrichten
 
 1. Gehen Sie zur [Google Cloud Console](https://console.cloud.google.com/)
 2. Erstellen Sie ein neues Projekt oder wählen Sie ein bestehendes
@@ -67,13 +83,35 @@ cd export-google-files
    - Navigieren Sie zu "APIs & Services" → "OAuth consent screen"
    - Fügen Sie Ihre E-Mail-Adresse als Testbenutzer hinzu
 
-### 3. Projekt bauen
+## Projekt bauen (nur für Entwickler)
 
 ```bash
 mvn clean package
 ```
 
-### 4. Credentials platzieren
+### Native Installer erstellen
+
+```bash
+# Windows (.msi)
+jpackage --input target --name GooglePhotosExporter \
+  --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
+  --main-class de.christianhoesel.googlephotos.ui.GooglePhotosApp \
+  --type msi --dest target/installer
+
+# macOS (.dmg)
+jpackage --input target --name GooglePhotosExporter \
+  --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
+  --main-class de.christianhoesel.googlephotos.ui.GooglePhotosApp \
+  --type dmg --dest target/installer
+
+# Linux (.deb)
+jpackage --input target --name GooglePhotosExporter \
+  --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
+  --main-class de.christianhoesel.googlephotos.ui.GooglePhotosApp \
+  --type deb --dest target/installer
+```
+
+### Credentials platzieren
 
 Kopieren Sie die `credentials.json` Datei in das Verzeichnis, von dem aus Sie die Anwendung starten werden.
 
