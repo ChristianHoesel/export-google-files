@@ -1,9 +1,14 @@
 # Google Photos Exporter
 
-Ein Java-Programm zum Exportieren von Fotos und Videos aus Google Photos mit Erhaltung aller Metadaten.
+Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Exportieren von Fotos und Videos aus Google Photos mit Erhaltung aller Metadaten.
+
+![Java Version](https://img.shields.io/badge/Java-25-orange)
+![JavaFX](https://img.shields.io/badge/JavaFX-21-blue)
+![License](https://img.shields.io/badge/License-Apache%202.0-green)
 
 ## Funktionen
 
+- **Moderne JavaFX-GUI** mit ansprechendem Design
 - **Export von Fotos und Videos** aus Google Photos
 - **Vollständige Metadaten-Erhaltung** inklusive:
   - EXIF-Daten (Kamera, Objektiv, Einstellungen)
@@ -11,15 +16,24 @@ Ein Java-Programm zum Exportieren von Fotos und Videos aus Google Photos mit Erh
   - Personen-Tags (sofern verfügbar über die API)
   - Erstellungsdatum und -zeit
   - Standortinformationen
-- **Zeitraum-Auswahl** - Export nur bestimmter Zeiträume möglich
+- **Zeitraum-Auswahl** mit Datumspicker
 - **Flexible Ordnerstruktur** - Nach Datum oder Album organisiert
 - **JSON-Metadaten-Dateien** für jedes exportierte Medium
-- **Einfache Benutzerführung** über die Kommandozeile
+- **Fortschrittsanzeige** während des Exports
 - **Optionale Löschfunktion** nach erfolgreichem Export
+
+## Screenshots
+
+Die Anwendung bietet eine moderne, benutzerfreundliche Oberfläche:
+
+- **Willkommensbildschirm** - Einfacher Einstieg mit Google-Verbindung
+- **Album-Übersicht** - Alle Ihre Alben auf einen Blick
+- **Export-Konfiguration** - Intuitive Einstellungen mit Datumspicker
+- **Fortschrittsanzeige** - Live-Status während des Exports
 
 ## Voraussetzungen
 
-- Java 17 oder höher
+- **Java 25** oder höher
 - Maven 3.6 oder höher
 - Google Cloud Projekt mit aktivierter Photos Library API
 - OAuth 2.0 Credentials (credentials.json)
@@ -65,31 +79,34 @@ Kopieren Sie die `credentials.json` Datei in das Verzeichnis, von dem aus Sie di
 
 ## Verwendung
 
-### Anwendung starten
+### GUI-Anwendung starten
 
 ```bash
+# Mit JavaFX Maven Plugin
+mvn javafx:run
+
+# Oder als JAR
 java -jar target/google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
-### Menüoptionen
+### Navigation
 
-1. **Export konfigurieren** - Einstellungen für den Export festlegen:
-   - Ausgabeverzeichnis
-   - Zeitraum (Start- und Enddatum)
-   - Medientypen (Fotos, Videos oder beide)
-   - Ordnerstruktur (nach Datum/Album)
-   - Metadaten-Export
-   - Löschoption
+Die Anwendung hat ein übersichtliches Seitenmenü:
 
-2. **Alben anzeigen** - Liste aller Alben in Ihrem Google Photos
+1. **🔗 Verbinden** - Mit Google Photos verbinden
+2. **📁 Alben** - Alle Alben anzeigen
+3. **⬇️ Export** - Export konfigurieren und starten
+4. **⚙️ Einstellungen** - App-Einstellungen
+5. **❓ Hilfe** - Hilfe und Dokumentation
 
-3. **Vorschau** - Zeigt an, wie viele Dateien exportiert werden würden
+### Export-Optionen
 
-4. **Export starten** - Führt den Export durch
-
-5. **Aktuelle Einstellungen anzeigen** - Zeigt die aktuellen Konfigurationsoptionen
-
-6. **Beenden** - Schließt die Anwendung
+- **Ausgabeverzeichnis** - Wo die Dateien gespeichert werden
+- **Zeitraum** - Start- und Enddatum mit Kalender-Widget
+- **Medientypen** - Fotos, Videos oder beide
+- **Ordnerstruktur** - Nach Datum (YYYY/MM) und/oder Album
+- **Metadaten** - JSON-Dateien für jedes Medium erstellen
+- **Löschen** - Optional nach Export löschen (mit Bestätigung)
 
 ## Ausgabestruktur
 
@@ -161,16 +178,30 @@ mvn clean compile
 mvn test
 ```
 
+### JavaFX-Anwendung starten (Entwicklung)
+
+```bash
+mvn javafx:run
+```
+
 ### JAR mit Abhängigkeiten erstellen
 
 ```bash
 mvn package
 ```
 
+## Technologie-Stack
+
+- **Java 25** - Neueste Java-Version
+- **JavaFX 21** - Moderne Desktop-GUI
+- **Google Photos Library API** - Zugriff auf Google Photos
+- **Maven** - Build-Management
+- **SLF4J + Logback** - Logging
+
 ## Bekannte Einschränkungen
 
 - Die Google Photos API erlaubt keinen programmatischen Zugriff auf Personen-Tags
-- Die Löschfunktion ist aus Sicherheitsgründen deaktiviert (nur Vorwarnung)
+- Die Löschfunktion ist aus Sicherheitsgründen mit Bestätigung versehen
 - Große Bibliotheken können einige Zeit für den Export benötigen
 
 ## Lizenz
