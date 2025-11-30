@@ -149,7 +149,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>de.christianhoesel.googlephotos.ui.GooglePhotosApp</mainClass>
+                            <mainClass>de.christianhoesel.googlephotos.Launcher</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -161,7 +161,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>de.christianhoesel.googlephotos.ui.GooglePhotosApp</mainClass>
+                            <mainClass>de.christianhoesel.googlephotos.Launcher</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
