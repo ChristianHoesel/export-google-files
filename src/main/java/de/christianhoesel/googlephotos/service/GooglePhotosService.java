@@ -159,70 +159,82 @@ public class GooglePhotosService {
      */
     public List<PhotoItem> searchMediaItems(ExportOptions options) {
         logger.info("Searching for media items...");
+        logger.info("Export options - Photos: {}, Videos: {}, StartDate: {}, EndDate: {}", 
+            options.isExportPhotos(), options.isExportVideos(), 
+            options.getStartDate(), options.getEndDate());
+        
         List<PhotoItem> items = new ArrayList<>();
         
         try {
+            // Check if we need filters
+            // IMPORTANT: Google Photos API requires BOTH start AND end date if using date filter!
+            boolean hasDateFilter = (options.getStartDate() != null && options.getEndDate() != null);
+            boolean hasMediaTypeFilter = (!options.isExportPhotos() || !options.isExportVideos());
+            boolean needsFilter = hasDateFilter || hasMediaTypeFilter;
+            
+            logger.info("Has date filter: {}, Has media type filter: {}", hasDateFilter, hasMediaTypeFilter);
+            
+            // If user set only one date, log a warning
+            if ((options.getStartDate() != null && options.getEndDate() == null) ||
+                (options.getStartDate() == null && options.getEndDate() != null)) {
+                logger.warn("Only one date boundary set - Google Photos API requires BOTH start AND end dates!");
+                logger.warn("StartDate: {}, EndDate: {}", options.getStartDate(), options.getEndDate());
+                logger.warn("Ignoring date filter and fetching all media items instead.");
+            }
+            
+            // If no filters needed, use the simple list method which returns ALL media items
+            if (!needsFilter) {
+                logger.info("No filters specified - using listMediaItems to get all media");
+                return listAllMediaItems();
+            }
+            
+            // Otherwise use search with filters
+            logger.info("Using searchMediaItems with filters");
             Filters.Builder filtersBuilder = Filters.newBuilder();
         
-        // Set date filter if date range is specified
-        if (options.getStartDate() != null || options.getEndDate() != null) {
-            DateFilter.Builder dateFilterBuilder = DateFilter.newBuilder();
-            
-            // Use date ranges
-            DateRange.Builder dateRangeBuilder = 
-                    DateRange.newBuilder();
-            
-            if (options.getStartDate() != null) {
+            // Set date filter if BOTH dates are specified
+            if (hasDateFilter) {
+                DateFilter.Builder dateFilterBuilder = DateFilter.newBuilder();
+                DateRange.Builder dateRangeBuilder = DateRange.newBuilder();
+                
+                // Both dates are guaranteed to be non-null here (checked above)
                 LocalDate start = options.getStartDate();
                 dateRangeBuilder.setStartDate(Date.newBuilder()
                         .setYear(start.getYear())
                         .setMonth(start.getMonthValue())
                         .setDay(start.getDayOfMonth())
                         .build());
-            } else {
-                // Default to a very old date
-                dateRangeBuilder.setStartDate(Date.newBuilder()
-                        .setYear(1900)
-                        .setMonth(1)
-                        .setDay(1)
-                        .build());
-            }
-            
-            if (options.getEndDate() != null) {
+                logger.info("Start date filter: {}", start);
+                
                 LocalDate end = options.getEndDate();
                 dateRangeBuilder.setEndDate(Date.newBuilder()
                         .setYear(end.getYear())
                         .setMonth(end.getMonthValue())
                         .setDay(end.getDayOfMonth())
                         .build());
-            } else {
-                // Default to today
-                LocalDate today = LocalDate.now();
-                dateRangeBuilder.setEndDate(Date.newBuilder()
-                        .setYear(today.getYear())
-                        .setMonth(today.getMonthValue())
-                        .setDay(today.getDayOfMonth())
-                        .build());
+                logger.info("End date filter: {}", end);
+                
+                dateFilterBuilder.addRanges(dateRangeBuilder.build());
+                filtersBuilder.setDateFilter(dateFilterBuilder.build());
             }
             
-            dateFilterBuilder.addRanges(dateRangeBuilder.build());
-            filtersBuilder.setDateFilter(dateFilterBuilder.build());
-        }
+            // Set media type filter only if not both selected
+            if (hasMediaTypeFilter) {
+                MediaTypeFilter.Builder mediaTypeFilterBuilder = MediaTypeFilter.newBuilder();
+                if (options.isExportPhotos()) {
+                    mediaTypeFilterBuilder.addMediaTypes(MediaTypeFilter.MediaType.PHOTO);
+                    logger.info("Media type filter: PHOTO only");
+                } else if (options.isExportVideos()) {
+                    mediaTypeFilterBuilder.addMediaTypes(MediaTypeFilter.MediaType.VIDEO);
+                    logger.info("Media type filter: VIDEO only");
+                }
+                filtersBuilder.setMediaTypeFilter(mediaTypeFilterBuilder.build());
+            }
         
-        // Set media type filter
-        MediaTypeFilter.Builder mediaTypeFilterBuilder = MediaTypeFilter.newBuilder();
-        if (options.isExportPhotos() && options.isExportVideos()) {
-            mediaTypeFilterBuilder.addMediaTypes(MediaTypeFilter.MediaType.ALL_MEDIA);
-        } else if (options.isExportPhotos()) {
-            mediaTypeFilterBuilder.addMediaTypes(MediaTypeFilter.MediaType.PHOTO);
-        } else if (options.isExportVideos()) {
-            mediaTypeFilterBuilder.addMediaTypes(MediaTypeFilter.MediaType.VIDEO);
-        }
-        filtersBuilder.setMediaTypeFilter(mediaTypeFilterBuilder.build());
-        
-        // Search for media items
+        // Search for media items with filters
         String pageToken = null;
         int totalFound = 0;
+        int emptyPageCount = 0; // Counter for consecutive empty pages
         do {
             // Check if thread was interrupted (task cancelled)
             if (Thread.currentThread().isInterrupted()) {
@@ -238,7 +250,26 @@ public class GooglePhotosService {
                 requestBuilder.setPageToken(pageToken);
             }
             
+            logger.debug("Sending search request with pageSize=100, hasPageToken={}", pageToken != null);
+            
             var response = client.searchMediaItemsCallable().call(requestBuilder.build());
+            
+            int itemsInResponse = response.getMediaItemsCount();
+            logger.debug("Received {} items in this page", itemsInResponse);
+            
+            // If we get 0 items, increment empty page counter
+            if (itemsInResponse == 0) {
+                emptyPageCount++;
+                logger.warn("Received empty page (#{}) with filters. This might indicate no matching media.", emptyPageCount);
+                
+                // Safety: Stop after 3 consecutive empty pages
+                if (emptyPageCount >= 3) {
+                    logger.warn("Stopping after {} consecutive empty pages.", emptyPageCount);
+                    break;
+                }
+            } else {
+                emptyPageCount = 0; // Reset counter when we get items
+            }
             
             for (MediaItem mediaItem : response.getMediaItemsList()) {
                 // Check if thread was interrupted
@@ -283,6 +314,96 @@ public class GooglePhotosService {
         } catch (Exception e) {
             logger.error("Error searching for media items", e);
             throw new RuntimeException("Failed to search media items", e);
+        }
+    }
+
+    /**
+     * Lists ALL media items in the user's Google Photos library without any filters.
+     * This is used when no specific date range or media type filter is specified.
+     * 
+     * @return List of all photo items
+     */
+    private List<PhotoItem> listAllMediaItems() {
+        logger.info("Listing all media items without filters...");
+        List<PhotoItem> items = new ArrayList<>();
+        
+        try {
+            String pageToken = null;
+            int totalFound = 0;
+            int emptyPageCount = 0; // Counter for consecutive empty pages
+            
+            do {
+                // Check if thread was interrupted (task cancelled)
+                if (Thread.currentThread().isInterrupted()) {
+                    logger.info("List cancelled by user");
+                    throw new InterruptedException("List was cancelled");
+                }
+                
+                // Use the mediaItems.list API endpoint instead of search
+                com.google.photos.library.v1.proto.ListMediaItemsRequest.Builder requestBuilder = 
+                    com.google.photos.library.v1.proto.ListMediaItemsRequest.newBuilder()
+                        .setPageSize(100);
+                
+                if (pageToken != null && !pageToken.isEmpty()) {
+                    requestBuilder.setPageToken(pageToken);
+                }
+                
+                logger.debug("Sending list request with pageSize=100");
+                
+                var response = client.listMediaItemsCallable().call(requestBuilder.build());
+                
+                int itemsInResponse = response.getMediaItemsCount();
+                logger.debug("Received {} items in this page", itemsInResponse);
+                
+                // If we get 0 items, increment empty page counter
+                if (itemsInResponse == 0) {
+                    emptyPageCount++;
+                    logger.warn("Received empty page (#{}) but nextPageToken is present. This might indicate an empty library.", emptyPageCount);
+                    
+                    // Safety: Stop after 3 consecutive empty pages to prevent infinite loops
+                    if (emptyPageCount >= 3) {
+                        logger.warn("Stopping after {} consecutive empty pages. Your Google Photos library might be empty.", emptyPageCount);
+                        break;
+                    }
+                } else {
+                    emptyPageCount = 0; // Reset counter when we get items
+                }
+                
+                for (MediaItem mediaItem : response.getMediaItemsList()) {
+                    // Check if thread was interrupted
+                    if (Thread.currentThread().isInterrupted()) {
+                        logger.info("List cancelled by user");
+                        throw new InterruptedException("List was cancelled");
+                    }
+                    
+                    PhotoItem item = convertMediaItem(mediaItem);
+                    
+                    // Add album information if we have the mapping
+                    if (mediaItemToAlbums.containsKey(item.getId())) {
+                        item.setAlbums(mediaItemToAlbums.get(item.getId()));
+                    }
+                    
+                    items.add(item);
+                    totalFound++;
+                    
+                    if (totalFound % 100 == 0) {
+                        logger.info("Listed {} media items so far...", totalFound);
+                    }
+                }
+                
+                pageToken = response.getNextPageToken();
+            } while (pageToken != null && !pageToken.isEmpty());
+            
+            logger.info("Listed {} media items total", items.size());
+            return items;
+            
+        } catch (InterruptedException e) {
+            logger.info("List operation was cancelled");
+            Thread.currentThread().interrupt();
+            return items;
+        } catch (Exception e) {
+            logger.error("Error listing all media items", e);
+            throw new RuntimeException("Failed to list media items", e);
         }
     }
 

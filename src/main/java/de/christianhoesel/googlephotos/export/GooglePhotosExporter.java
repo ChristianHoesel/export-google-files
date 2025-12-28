@@ -1,15 +1,5 @@
 package de.christianhoesel.googlephotos.export;
 
-import de.christianhoesel.googlephotos.model.Album;
-import de.christianhoesel.googlephotos.model.ExportOptions;
-import de.christianhoesel.googlephotos.model.PhotoItem;
-import de.christianhoesel.googlephotos.service.ExportService;
-import de.christianhoesel.googlephotos.service.GoogleAuthService;
-import de.christianhoesel.googlephotos.service.GooglePhotosService;
-import com.google.photos.library.v1.PhotosLibraryClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -17,6 +7,18 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.photos.library.v1.PhotosLibraryClient;
+
+import de.christianhoesel.googlephotos.model.Album;
+import de.christianhoesel.googlephotos.model.ExportOptions;
+import de.christianhoesel.googlephotos.model.PhotoItem;
+import de.christianhoesel.googlephotos.service.ExportService;
+import de.christianhoesel.googlephotos.service.GoogleAuthService;
+import de.christianhoesel.googlephotos.service.GooglePhotosService;
 
 /**
  * Main application class for Google Photos Exporter.

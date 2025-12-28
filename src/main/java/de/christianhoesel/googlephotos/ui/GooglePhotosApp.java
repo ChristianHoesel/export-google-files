@@ -1,22 +1,15 @@
 package de.christianhoesel.googlephotos.ui;
 
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.Stage;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.concurrent.Task;
+import java.io.File;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.photos.library.v1.PhotosLibraryClient;
 
 import de.christianhoesel.googlephotos.model.Album;
 import de.christianhoesel.googlephotos.model.ExportOptions;
@@ -24,16 +17,38 @@ import de.christianhoesel.googlephotos.model.PhotoItem;
 import de.christianhoesel.googlephotos.service.ExportService;
 import de.christianhoesel.googlephotos.service.GoogleAuthService;
 import de.christianhoesel.googlephotos.service.GooglePhotosService;
-import com.google.photos.library.v1.PhotosLibraryClient;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.stage.DirectoryChooser;
+import javafx.stage.Stage;
 
 /**
  * JavaFX Application for Google Photos Export.
@@ -445,14 +460,29 @@ public class GooglePhotosApp extends Application {
         // Date range
         Label dateLabel = new Label("Zeitraum:");
         DatePicker startDate = new DatePicker();
-        startDate.setPromptText("Startdatum");
+        startDate.setPromptText("Startdatum (beide oder keines)");
         DatePicker endDate = new DatePicker();
-        endDate.setPromptText("Enddatum");
-        endDate.setValue(LocalDate.now());
+        endDate.setPromptText("Enddatum (beide oder keines)");
+        // Don't set default values - leave both empty for "all media"
+        
+        // Add tooltip to explain the requirement
+        Tooltip dateTooltip = new Tooltip("Für einen Datumsfilter müssen BEIDE Felder gesetzt werden.\nLassen Sie beide leer für alle Medien.");
+        startDate.setTooltip(dateTooltip);
+        endDate.setTooltip(dateTooltip);
+        
+        // Warning label (hidden by default)
+        Label dateWarning = new Label("⚠ Beide Datumswerte erforderlich oder beide leer lassen");
+        dateWarning.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 11px;");
+        dateWarning.setVisible(false);
+        dateWarning.setManaged(false);
+        
+        VBox dateVBox = new VBox(5);
         HBox dateBox = new HBox(10, startDate, new Label("bis"), endDate);
         dateBox.setAlignment(Pos.CENTER_LEFT);
+        dateVBox.getChildren().addAll(dateBox, dateWarning);
+        
         form.add(dateLabel, 0, row);
-        form.add(dateBox, 1, row++);
+        form.add(dateVBox, 1, row++);
 
         // Media types
         Label mediaLabel = new Label("Medientypen:");
@@ -495,23 +525,72 @@ public class GooglePhotosApp extends Application {
         Button previewButton = new Button("🔍 Vorschau");
         previewButton.getStyleClass().add("secondary-button");
         previewButton.setOnAction(e -> {
-            updateExportOptions(outputField, startDate, endDate, photosCheck, videosCheck,
-                dateFoldersCheck, albumFoldersCheck, metaFileCheck, deleteCheck);
-            showPreview();
+            if (validateAndUpdateExportOptions(outputField, startDate, endDate, photosCheck, videosCheck,
+                dateFoldersCheck, albumFoldersCheck, metaFileCheck, deleteCheck, dateWarning)) {
+                showPreview();
+            }
         });
 
         Button exportButton = new Button("⬇️ Export starten");
         exportButton.getStyleClass().add("primary-button");
         exportButton.setOnAction(e -> {
-            updateExportOptions(outputField, startDate, endDate, photosCheck, videosCheck,
-                dateFoldersCheck, albumFoldersCheck, metaFileCheck, deleteCheck);
-            startExport();
+            if (validateAndUpdateExportOptions(outputField, startDate, endDate, photosCheck, videosCheck,
+                dateFoldersCheck, albumFoldersCheck, metaFileCheck, deleteCheck, dateWarning)) {
+                startExport();
+            }
         });
 
         buttonBox.getChildren().addAll(previewButton, exportButton);
 
         exportView.getChildren().addAll(title, form, buttonBox);
         setContent(exportView);
+    }
+
+    private boolean validateAndUpdateExportOptions(TextField outputField, DatePicker startDate, DatePicker endDate,
+                                                   CheckBox photosCheck, CheckBox videosCheck,
+                                                   CheckBox dateFoldersCheck, CheckBox albumFoldersCheck,
+                                                   CheckBox metaFileCheck, CheckBox deleteCheck,
+                                                   Label dateWarning) {
+        exportOptions.setOutputDirectory(outputField.getText());
+        
+        // Validate date range - both or none must be set
+        LocalDate start = startDate.getValue();
+        LocalDate end = endDate.getValue();
+        
+        if ((start != null && end == null) || (start == null && end != null)) {
+            // Only one date is set - show visual feedback
+            logger.warn("Date validation: Only one date boundary set");
+            
+            // Show warning label
+            dateWarning.setVisible(true);
+            dateWarning.setManaged(true);
+            
+            // Add red border to date pickers
+            startDate.setStyle("-fx-border-color: #e74c3c; -fx-border-width: 2px;");
+            endDate.setStyle("-fx-border-color: #e74c3c; -fx-border-width: 2px;");
+            
+            // Scroll to the date fields if possible
+            setStatus("⚠ Bitte setzen Sie beide Datumswerte oder lassen Sie beide leer");
+            
+            return false; // Validation failed
+        } else {
+            // Valid input - hide warning and remove red borders
+            dateWarning.setVisible(false);
+            dateWarning.setManaged(false);
+            startDate.setStyle("");
+            endDate.setStyle("");
+        }
+        
+        exportOptions.setStartDate(start);
+        exportOptions.setEndDate(end);
+        exportOptions.setExportPhotos(photosCheck.isSelected());
+        exportOptions.setExportVideos(videosCheck.isSelected());
+        exportOptions.setCreateDateFolders(dateFoldersCheck.isSelected());
+        exportOptions.setCreateAlbumFolders(albumFoldersCheck.isSelected());
+        exportOptions.setWriteMetadataFile(metaFileCheck.isSelected());
+        exportOptions.setDeleteAfterExport(deleteCheck.isSelected());
+        
+        return true; // Validation successful
     }
 
     private void updateExportOptions(TextField outputField, DatePicker startDate, DatePicker endDate,
