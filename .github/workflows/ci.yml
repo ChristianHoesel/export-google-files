@@ -1,0 +1,229 @@
+name: CI Build
+
+on:
+  push:
+    branches: [ main, master, 'copilot/**' ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  APP_NAME: GooglePhotosExporter
+  APP_VERSION: 1.0.0
+  MAIN_CLASS: de.christianhoesel.googlephotos.Launcher
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build with Maven
+      run: mvn clean package -DskipTests
+
+    - name: Run tests
+      run: mvn test
+
+  # Build self-contained executables with bundled JDK for each platform
+  package-windows:
+    runs-on: windows-latest
+    needs: build
+    continue-on-error: true
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build JAR
+      run: mvn clean package -DskipTests
+
+    - name: Create self-contained app with jpackage
+      run: |
+        jpackage --input target `
+          --name "${{ env.APP_NAME }}" `
+          --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar `
+          --main-class ${{ env.MAIN_CLASS }} `
+          --type app-image `
+          --app-version ${{ env.APP_VERSION }} `
+          --vendor "Christian Hoesel" `
+          --description "Export photos and videos from Google Photos" `
+          --dest target/app `
+          --win-console
+
+    - name: Create ZIP archive
+      run: Compress-Archive -Path "target/app/${{ env.APP_NAME }}" -DestinationPath "target/${{ env.APP_NAME }}-windows.zip"
+
+    - name: Upload Windows executable
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-${{ github.run_number }}
+        path: target/${{ env.APP_NAME }}-windows.zip
+        retention-days: 90
+
+  package-macos:
+    runs-on: macos-latest
+    needs: build
+    continue-on-error: true
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build JAR
+      run: mvn clean package -DskipTests
+
+    - name: Create self-contained app with jpackage
+      run: |
+        jpackage --input target \
+          --name "${{ env.APP_NAME }}" \
+          --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
+          --main-class ${{ env.MAIN_CLASS }} \
+          --type app-image \
+          --app-version ${{ env.APP_VERSION }} \
+          --vendor "Christian Hoesel" \
+          --description "Export photos and videos from Google Photos" \
+          --dest target/app
+
+    - name: Create ZIP archive
+      run: cd target/app && zip -r "../${{ env.APP_NAME }}-macos.zip" "${{ env.APP_NAME }}.app"
+
+    - name: Upload macOS executable
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-${{ github.run_number }}
+        path: target/${{ env.APP_NAME }}-macos.zip
+        retention-days: 90
+
+  package-linux:
+    runs-on: ubuntu-latest
+    needs: build
+    continue-on-error: true
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build JAR
+      run: mvn clean package -DskipTests
+
+    - name: Create self-contained app with jpackage
+      run: |
+        jpackage --input target \
+          --name "${{ env.APP_NAME }}" \
+          --main-jar google-photos-export-1.0.0-SNAPSHOT-jar-with-dependencies.jar \
+          --main-class ${{ env.MAIN_CLASS }} \
+          --type app-image \
+          --app-version ${{ env.APP_VERSION }} \
+          --vendor "Christian Hoesel" \
+          --description "Export photos and videos from Google Photos" \
+          --dest target/app
+
+    - name: Create ZIP archive
+      run: cd target/app && zip -r "../${{ env.APP_NAME }}-linux.zip" "${{ env.APP_NAME }}"
+
+    - name: Upload Linux executable
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-${{ github.run_number }}
+        path: target/${{ env.APP_NAME }}-linux.zip
+        retention-days: 90
+
+  # Cleanup old artifacts - keep only the latest 3 of each type
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [build, package-windows, package-macos, package-linux]
+    if: always()
+    permissions:
+      actions: write
+    
+    steps:
+    - name: Delete old artifacts
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          
+          // Get all artifacts
+          const artifacts = await github.rest.actions.listArtifactsForRepo({
+            owner,
+            repo,
+            per_page: 100
+          });
+          
+          // Group artifacts by type prefix
+          const artifactGroups = {};
+          const prefixes = ['windows-', 'macos-', 'linux-'];
+          
+          for (const artifact of artifacts.data.artifacts) {
+            for (const prefix of prefixes) {
+              if (artifact.name.startsWith(prefix)) {
+                if (!artifactGroups[prefix]) {
+                  artifactGroups[prefix] = [];
+                }
+                artifactGroups[prefix].push(artifact);
+                break;
+              }
+            }
+          }
+          
+          // For each group, keep only the latest 3
+          for (const [prefix, groupArtifacts] of Object.entries(artifactGroups)) {
+            // Sort by creation date (newest first)
+            groupArtifacts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            
+            // Delete artifacts beyond the first 3
+            const toDelete = groupArtifacts.slice(3);
+            
+            for (const artifact of toDelete) {
+              console.log(`Deleting artifact: ${artifact.name} (ID: ${artifact.id})`);
+              await github.rest.actions.deleteArtifact({
+                owner,
+                repo,
+                artifact_id: artifact.id
+              });
+            }
+            
+            console.log(`${prefix}: Kept ${Math.min(groupArtifacts.length, 3)}, deleted ${toDelete.length}`);
+          }
+
