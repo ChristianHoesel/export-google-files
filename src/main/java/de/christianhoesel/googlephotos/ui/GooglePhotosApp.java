@@ -32,6 +32,8 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * JavaFX Application for Google Photos Export.
@@ -45,6 +47,9 @@ public class GooglePhotosApp extends Application {
     private GoogleAuthService authService;
     private GooglePhotosService photosService;
     private ExportOptions exportOptions;
+    
+    // Task executor
+    private ExecutorService executorService;
 
     // UI Components
     private Stage primaryStage;
@@ -53,14 +58,24 @@ public class GooglePhotosApp extends Application {
     private StackPane contentArea;
     private Label statusLabel;
     private ProgressBar progressBar;
+    private Button cancelButton;
 
     // State
     private boolean isAuthenticated = false;
+    private Task<?> currentTask = null;
 
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
         this.exportOptions = new ExportOptions();
+        
+        // Initialize executor service for background tasks
+        this.executorService = Executors.newSingleThreadExecutor(r -> {
+            Thread thread = new Thread(r);
+            thread.setDaemon(true); // Daemon threads don't prevent JVM shutdown
+            thread.setName("GooglePhotosExporter-Worker");
+            return thread;
+        });
 
         primaryStage.setTitle("Google Photos Exporter");
         primaryStage.setMinWidth(1000);
@@ -174,7 +189,12 @@ public class GooglePhotosApp extends Application {
         progressBar.setPrefWidth(200);
         progressBar.setVisible(false);
 
-        statusBar.getChildren().addAll(statusLabel, spacer, progressBar);
+        cancelButton = new Button("✖ Abbrechen");
+        cancelButton.getStyleClass().add("danger-button");
+        cancelButton.setVisible(false);
+        cancelButton.setOnAction(e -> cancelCurrentTask());
+
+        statusBar.getChildren().addAll(statusLabel, spacer, progressBar, cancelButton);
         return statusBar;
     }
 
@@ -220,6 +240,17 @@ public class GooglePhotosApp extends Application {
         setContent(welcomeBox);
     }
 
+    private void cancelCurrentTask() {
+        if (currentTask != null && currentTask.isRunning()) {
+            logger.info("Cancelling current task");
+            currentTask.cancel();
+            setStatus("Vorgang abgebrochen");
+            progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            currentTask = null;
+        }
+    }
+
     private void handleConnect() {
         if (isAuthenticated) {
             showInfo("Bereits verbunden", "Sie sind bereits mit Google Photos verbunden.");
@@ -229,6 +260,7 @@ public class GooglePhotosApp extends Application {
         setStatus("Verbindung wird hergestellt...");
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        cancelButton.setVisible(true);
 
         Task<Boolean> connectTask = new Task<>() {
             @Override
@@ -240,17 +272,23 @@ public class GooglePhotosApp extends Application {
             }
         };
 
+        currentTask = connectTask;
+
         connectTask.setOnSucceeded(e -> {
             isAuthenticated = true;
             progressBar.setVisible(false);
+            cancelButton.setVisible(false);
             setStatus("Verbunden mit Google Photos");
             updateConnectionStatus(true);
             showExportView();
+            currentTask = null;
         });
 
         connectTask.setOnFailed(e -> {
             progressBar.setVisible(false);
+            cancelButton.setVisible(false);
             setStatus("Verbindung fehlgeschlagen");
+            currentTask = null;
             Throwable ex = connectTask.getException();
             logger.error("Connection failed", ex);
             showError("Verbindungsfehler",
@@ -259,7 +297,14 @@ public class GooglePhotosApp extends Application {
                 "Fehler: " + ex.getMessage());
         });
 
-        new Thread(connectTask).start();
+        connectTask.setOnCancelled(e -> {
+            progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            setStatus("Verbindung abgebrochen");
+            currentTask = null;
+        });
+
+        executorService.submit(connectTask);
     }
 
     private void updateConnectionStatus(boolean connected) {
@@ -320,6 +365,7 @@ public class GooglePhotosApp extends Application {
         setStatus("Lade Alben...");
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        cancelButton.setVisible(true);
 
         Task<List<Album>> loadTask = new Task<>() {
             @Override
@@ -328,21 +374,34 @@ public class GooglePhotosApp extends Application {
             }
         };
 
+        currentTask = loadTask;
+
         loadTask.setOnSucceeded(e -> {
             List<Album> albums = loadTask.getValue();
             ObservableList<Album> items = FXCollections.observableArrayList(albums);
             table.setItems(items);
             progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            currentTask = null;
             setStatus(albums.size() + " Alben gefunden");
         });
 
         loadTask.setOnFailed(e -> {
             progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            currentTask = null;
             setStatus("Fehler beim Laden der Alben");
             showError("Fehler", "Die Alben konnten nicht geladen werden: " + loadTask.getException().getMessage());
         });
 
-        new Thread(loadTask).start();
+        loadTask.setOnCancelled(e -> {
+            progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            currentTask = null;
+            setStatus("Laden der Alben abgebrochen");
+        });
+
+        executorService.submit(loadTask);
     }
 
     private void showExportView() {
@@ -474,6 +533,7 @@ public class GooglePhotosApp extends Application {
         setStatus("Suche Medien...");
         progressBar.setVisible(true);
         progressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+        cancelButton.setVisible(true);
 
         Task<List<PhotoItem>> previewTask = new Task<>() {
             @Override
@@ -482,9 +542,13 @@ public class GooglePhotosApp extends Application {
             }
         };
 
+        currentTask = previewTask;
+
         previewTask.setOnSucceeded(e -> {
             List<PhotoItem> items = previewTask.getValue();
             progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            currentTask = null;
 
             long photoCount = items.stream().filter(PhotoItem::isPhoto).count();
             long videoCount = items.stream().filter(PhotoItem::isVideo).count();
@@ -502,11 +566,20 @@ public class GooglePhotosApp extends Application {
 
         previewTask.setOnFailed(e -> {
             progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            currentTask = null;
             setStatus("Fehler bei der Vorschau");
             showError("Fehler", "Die Vorschau konnte nicht erstellt werden: " + previewTask.getException().getMessage());
         });
 
-        new Thread(previewTask).start();
+        previewTask.setOnCancelled(e -> {
+            progressBar.setVisible(false);
+            cancelButton.setVisible(false);
+            currentTask = null;
+            setStatus("Vorschau abgebrochen");
+        });
+
+        executorService.submit(previewTask);
     }
 
     private void startExport() {
@@ -546,10 +619,10 @@ public class GooglePhotosApp extends Application {
         Label statsLabel = new Label("");
         statsLabel.getStyleClass().add("stats-label");
 
-        Button cancelButton = new Button("❌ Abbrechen");
-        cancelButton.getStyleClass().add("danger-button");
+        Button exportCancelButton = new Button("❌ Abbrechen");
+        exportCancelButton.getStyleClass().add("danger-button");
 
-        progressView.getChildren().addAll(title, exportProgress, progressLabel, statsLabel, cancelButton);
+        progressView.getChildren().addAll(title, exportProgress, progressLabel, statsLabel, exportCancelButton);
         setContent(progressView);
 
         // Start export task
@@ -597,26 +670,38 @@ public class GooglePhotosApp extends Application {
             }
         };
 
-        cancelButton.setOnAction(e -> {
+        currentTask = exportTask;
+
+        exportCancelButton.setOnAction(e -> {
             exportTask.cancel();
+            currentTask = null;
             showExportView();
         });
 
         exportTask.setOnSucceeded(e -> {
-            cancelButton.setText("✓ Fertig - Zurück");
-            cancelButton.getStyleClass().remove("danger-button");
-            cancelButton.getStyleClass().add("primary-button");
-            cancelButton.setOnAction(ev -> showExportView());
+            exportCancelButton.setText("✓ Fertig - Zurück");
+            exportCancelButton.getStyleClass().remove("danger-button");
+            exportCancelButton.getStyleClass().add("primary-button");
+            exportCancelButton.setOnAction(ev -> showExportView());
             setStatus("Export abgeschlossen");
+            currentTask = null;
         });
 
         exportTask.setOnFailed(e -> {
             progressLabel.setText("Export fehlgeschlagen: " + exportTask.getException().getMessage());
-            cancelButton.setText("Zurück");
+            exportCancelButton.setText("Zurück");
             setStatus("Export fehlgeschlagen");
+            currentTask = null;
         });
 
-        new Thread(exportTask).start();
+        exportTask.setOnCancelled(e -> {
+            progressLabel.setText("Export abgebrochen");
+            exportCancelButton.setText("Zurück");
+            setStatus("Export abgebrochen");
+            currentTask = null;
+        });
+
+        executorService.submit(exportTask);
     }
 
     private void showSettingsView() {
@@ -757,9 +842,34 @@ public class GooglePhotosApp extends Application {
 
     @Override
     public void stop() {
+        logger.info("Shutting down application...");
+        
+        // Cancel any running task
+        if (currentTask != null && currentTask.isRunning()) {
+            logger.info("Cancelling running task before shutdown");
+            currentTask.cancel();
+        }
+        
+        // Shutdown executor service
+        if (executorService != null) {
+            logger.info("Shutting down executor service");
+            executorService.shutdownNow();
+            try {
+                if (!executorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    logger.warn("Executor service did not terminate in time");
+                }
+            } catch (InterruptedException e) {
+                logger.warn("Interrupted while waiting for executor service shutdown", e);
+                Thread.currentThread().interrupt();
+            }
+        }
+        
+        // Close auth service
         if (authService != null) {
             authService.close();
         }
+        
+        logger.info("Application shutdown complete");
     }
 
     public static void main(String[] args) {

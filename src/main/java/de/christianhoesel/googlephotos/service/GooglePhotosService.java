@@ -49,25 +49,51 @@ public class GooglePhotosService {
         logger.info("Fetching albums from Google Photos...");
         List<Album> albums = new ArrayList<>();
         
-        String pageToken = null;
-        do {
-            ListAlbumsRequest request = ListAlbumsRequest.newBuilder()
-                    .setPageSize(50)
-                    .setPageToken(pageToken != null ? pageToken : "")
-                    .build();
+        try {
+            String pageToken = null;
+            do {
+                // Check if thread was interrupted (task cancelled)
+                if (Thread.currentThread().isInterrupted()) {
+                    logger.info("Album loading cancelled by user");
+                    throw new InterruptedException("Album loading was cancelled");
+                }
+                
+                ListAlbumsRequest request = ListAlbumsRequest.newBuilder()
+                        .setPageSize(50)
+                        .setPageToken(pageToken != null ? pageToken : "")
+                        .build();
+                
+                ListAlbumsResponse response = client.listAlbumsCallable().call(request);
+                
+                for (com.google.photos.types.proto.Album googleAlbum : response.getAlbumsList()) {
+                    // Check if thread was interrupted
+                    if (Thread.currentThread().isInterrupted()) {
+                        logger.info("Album loading cancelled by user");
+                        throw new InterruptedException("Album loading was cancelled");
+                    }
+                    
+                    Album album = convertAlbum(googleAlbum);
+                    albums.add(album);
+                }
+                
+                pageToken = response.getNextPageToken();
+            } while (pageToken != null && !pageToken.isEmpty());
             
-            ListAlbumsResponse response = client.listAlbumsCallable().call(request);
-            
-            for (com.google.photos.types.proto.Album googleAlbum : response.getAlbumsList()) {
-                Album album = convertAlbum(googleAlbum);
-                albums.add(album);
-            }
-            
-            pageToken = response.getNextPageToken();
-        } while (pageToken != null && !pageToken.isEmpty());
-        
-        logger.info("Found {} albums", albums.size());
-        return albums;
+            logger.info("Found {} albums", albums.size());
+            return albums;
+        } catch (InterruptedException e) {
+            logger.info("Album loading operation was cancelled");
+            Thread.currentThread().interrupt(); // Restore interrupt status
+            return albums; // Return what we found so far
+        } catch (com.google.api.gax.rpc.PermissionDeniedException e) {
+            logger.error("PERMISSION_DENIED error occurred while listing albums.");
+            logger.error("Required scope: https://www.googleapis.com/auth/photoslibrary.readonly");
+            logger.error("Full error: {}", e.getMessage());
+            throw new RuntimeException("Insufficient permissions to list albums. Please re-authenticate with proper scopes.", e);
+        } catch (Exception e) {
+            logger.error("Error listing albums", e);
+            throw new RuntimeException("Failed to list albums", e);
+        }
     }
 
     /**
@@ -135,7 +161,8 @@ public class GooglePhotosService {
         logger.info("Searching for media items...");
         List<PhotoItem> items = new ArrayList<>();
         
-        Filters.Builder filtersBuilder = Filters.newBuilder();
+        try {
+            Filters.Builder filtersBuilder = Filters.newBuilder();
         
         // Set date filter if date range is specified
         if (options.getStartDate() != null || options.getEndDate() != null) {
@@ -197,6 +224,12 @@ public class GooglePhotosService {
         String pageToken = null;
         int totalFound = 0;
         do {
+            // Check if thread was interrupted (task cancelled)
+            if (Thread.currentThread().isInterrupted()) {
+                logger.info("Search cancelled by user");
+                throw new InterruptedException("Search was cancelled");
+            }
+            
             SearchMediaItemsRequest.Builder requestBuilder = SearchMediaItemsRequest.newBuilder()
                     .setFilters(filtersBuilder.build())
                     .setPageSize(100);
@@ -208,6 +241,12 @@ public class GooglePhotosService {
             var response = client.searchMediaItemsCallable().call(requestBuilder.build());
             
             for (MediaItem mediaItem : response.getMediaItemsList()) {
+                // Check if thread was interrupted
+                if (Thread.currentThread().isInterrupted()) {
+                    logger.info("Search cancelled by user");
+                    throw new InterruptedException("Search was cancelled");
+                }
+                
                 PhotoItem item = convertMediaItem(mediaItem);
                 
                 // Add album information if we have the mapping
@@ -228,6 +267,23 @@ public class GooglePhotosService {
         
         logger.info("Found {} media items total", items.size());
         return items;
+        } catch (InterruptedException e) {
+            logger.info("Search operation was cancelled");
+            Thread.currentThread().interrupt(); // Restore interrupt status
+            return items; // Return what we found so far
+        } catch (com.google.api.gax.rpc.PermissionDeniedException e) {
+            logger.error("PERMISSION_DENIED error occurred. This usually means:");
+            logger.error("1. The OAuth consent screen in Google Cloud Console doesn't have the required scopes");
+            logger.error("2. The authentication tokens were created with insufficient scopes");
+            logger.error("3. The API is not enabled in the Google Cloud Console");
+            logger.error("Please check: https://console.cloud.google.com/apis/credentials/consent");
+            logger.error("Required scope: https://www.googleapis.com/auth/photoslibrary.readonly");
+            logger.error("Full error: {}", e.getMessage());
+            throw new RuntimeException("Insufficient permissions to access Google Photos. Please check the logs for details.", e);
+        } catch (Exception e) {
+            logger.error("Error searching for media items", e);
+            throw new RuntimeException("Failed to search media items", e);
+        }
     }
 
     /**
