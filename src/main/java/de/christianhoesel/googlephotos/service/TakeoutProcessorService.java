@@ -264,6 +264,7 @@ public class TakeoutProcessorService {
     
     /**
      * Ensures the filename is unique by appending a number if needed.
+     * Limits the number of attempts to avoid infinite loops.
      */
     private File ensureUniqueFilename(File file) {
         if (!file.exists()) {
@@ -285,9 +286,18 @@ public class TakeoutProcessorService {
         
         int counter = 1;
         File uniqueFile;
+        final int MAX_ATTEMPTS = 10000; // Prevent infinite loops
+        
         do {
             uniqueFile = new File(file.getParentFile(), baseName + "_" + counter + extension);
             counter++;
+            
+            if (counter > MAX_ATTEMPTS) {
+                // Use timestamp-based naming as fallback
+                String timestamp = String.valueOf(System.currentTimeMillis());
+                uniqueFile = new File(file.getParentFile(), baseName + "_" + timestamp + extension);
+                break;
+            }
         } while (uniqueFile.exists());
         
         return uniqueFile;

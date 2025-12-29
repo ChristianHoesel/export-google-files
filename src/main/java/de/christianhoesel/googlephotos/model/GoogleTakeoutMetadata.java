@@ -95,7 +95,10 @@ public class GoogleTakeoutMetadata {
         }
 
         public boolean hasValidCoordinates() {
-            return latitude != 0.0 || longitude != 0.0;
+            // Note: (0.0, 0.0) is a valid location in the Gulf of Guinea,
+            // but in the context of Google Photos, it typically indicates
+            // that no GPS data was available. We use this heuristic.
+            return (latitude != 0.0 || longitude != 0.0);
         }
     }
 

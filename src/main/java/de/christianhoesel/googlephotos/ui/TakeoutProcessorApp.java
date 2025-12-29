@@ -59,7 +59,16 @@ public class TakeoutProcessorApp extends Application {
         createMainLayout();
 
         Scene scene = new Scene(mainLayout, 1000, 700);
-        scene.getStylesheets().add(getClass().getResource("/styles/app.css").toExternalForm());
+        
+        // Load CSS if available
+        try {
+            var cssResource = getClass().getResource("/styles/app.css");
+            if (cssResource != null) {
+                scene.getStylesheets().add(cssResource.toExternalForm());
+            }
+        } catch (Exception e) {
+            logger.warn("Could not load CSS stylesheet: {}", e.getMessage());
+        }
         
         primaryStage.setScene(scene);
         primaryStage.show();
