@@ -234,8 +234,8 @@ public class GoogleTakeoutService {
      */
     private GoogleTakeoutMetadata parseMetadataFile(File jsonFile) throws IOException {
         // Use UTF-8 explicitly to handle special characters correctly
-        try (java.io.InputStreamReader reader = new java.io.InputStreamReader(
-                new java.io.FileInputStream(jsonFile), java.nio.charset.StandardCharsets.UTF_8)) {
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(jsonFile), StandardCharsets.UTF_8)) {
             return gson.fromJson(reader, GoogleTakeoutMetadata.class);
         }
     }

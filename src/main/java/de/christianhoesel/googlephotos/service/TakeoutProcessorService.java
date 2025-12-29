@@ -103,6 +103,7 @@ public class TakeoutProcessorService {
         
         // For JPEG images with metadata, write EXIF data
         if (options.isAddMetadata() && 
+            (metadata != null || albumName != null) &&
             fileWithMetadata.isImage() && 
             isJpeg(mediaFile)) {
             
