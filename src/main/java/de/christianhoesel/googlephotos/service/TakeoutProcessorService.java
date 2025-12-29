@@ -246,6 +246,39 @@ public class TakeoutProcessorService {
             rootDirectory.add(TiffTagConstants.TIFF_TAG_IMAGE_DESCRIPTION, metadata.getDescription());
         }
         
+        // Write people/keywords if available
+        // Note: EXIF doesn't have a standard "people" field. We append people names to the description
+        // or store them in the Software field as a workaround
+        if (metadata.getPeople() != null && !metadata.getPeople().isEmpty()) {
+            StringBuilder peopleStr = new StringBuilder();
+            for (int i = 0; i < metadata.getPeople().size(); i++) {
+                if (i > 0) peopleStr.append(", ");
+                peopleStr.append(metadata.getPeople().get(i).getName());
+            }
+            
+            // Store people in the Software field (not ideal but works for preservation)
+            String peopleTag = "People: " + peopleStr.toString();
+            try {
+                rootDirectory.removeField(TiffTagConstants.TIFF_TAG_SOFTWARE);
+                rootDirectory.add(TiffTagConstants.TIFF_TAG_SOFTWARE, peopleTag);
+                logger.debug("Added {} people to EXIF for {}", metadata.getPeople().size(), sourceFile.getName());
+            } catch (Exception e) {
+                logger.warn("Could not write people to EXIF for {}: {}", sourceFile.getName(), e.getMessage());
+            }
+        }
+        
+        // Write title if available and different from filename
+        if (metadata.getTitle() != null && !metadata.getTitle().trim().isEmpty() 
+            && !metadata.getTitle().equals(sourceFile.getName())) {
+            // Store title in DocumentName field
+            try {
+                rootDirectory.removeField(TiffTagConstants.TIFF_TAG_DOCUMENT_NAME);
+                rootDirectory.add(TiffTagConstants.TIFF_TAG_DOCUMENT_NAME, metadata.getTitle());
+            } catch (Exception e) {
+                logger.debug("Could not write title to EXIF: {}", e.getMessage());
+            }
+        }
+        
         // Write to destination file
         try (FileOutputStream fos = new FileOutputStream(destFile);
              BufferedOutputStream bos = new BufferedOutputStream(fos)) {
