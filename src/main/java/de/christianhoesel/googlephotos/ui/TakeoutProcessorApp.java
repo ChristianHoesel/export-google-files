@@ -304,9 +304,9 @@ public class TakeoutProcessorApp extends Application {
 
         // Metadata options
         Label metadataLabel = new Label("Metadaten:");
-        CheckBox addMetadataCheck = new CheckBox("EXIF-Metadaten zu Bildern hinzufügen");
+        CheckBox addMetadataCheck = new CheckBox("EXIF & XMP-Metadaten zu Bildern hinzufügen");
         addMetadataCheck.setSelected(true);
-        addMetadataCheck.setTooltip(new Tooltip("Schreibt Datum, Beschreibung, Titel, Personen und Album in EXIF"));
+        addMetadataCheck.setTooltip(new Tooltip("Schreibt Datum, Beschreibung, Titel, Personen und Album in EXIF & XMP"));
         form.add(metadataLabel, 0, row);
         form.add(addMetadataCheck, 1, row++);
 
@@ -566,7 +566,7 @@ public class TakeoutProcessorApp extends Application {
                - Wähle die gewünschten Optionen:
                  * Kopieren/Verschieben
                  * Organisation: Nach Monat / Nach Album / Flach
-                 * EXIF-Metadaten hinzufügen
+                 * EXIF & XMP-Metadaten hinzufügen
                - Klicke auf "Vorschau" um zu sehen, was gefunden wurde
                - Klicke auf "Verarbeiten" um zu starten
             
@@ -574,7 +574,7 @@ public class TakeoutProcessorApp extends Application {
                Die App:
                - Scannt alle Bilder und Videos im Takeout-Ordner
                - Liest die JSON-Metadaten-Dateien
-               - Schreibt optional Metadaten in EXIF (für JPEGs)
+               - Schreibt optional Metadaten in EXIF & XMP (für JPEGs)
                - Organisiert Dateien nach gewählter Option
                - Kopiert oder verschiebt die Dateien
             
@@ -589,8 +589,15 @@ public class TakeoutProcessorApp extends Application {
                - Personen (EXIF Software als "People: Name1, Name2")
                - Album (EXIF Artist als "Album: AlbumName")
                
+               XMP-Felder:
+               - Personen (XMP dc:subject Keywords)
+               - Album (XMP lr:hierarchicalSubject)
+               - Titel (XMP dc:title)
+               - Beschreibung (XMP dc:description)
+               
                Hinweis: Album-Namen werden aus der Ordnerstruktur des
-               Takeout-Exports extrahiert.
+               Takeout-Exports extrahiert. XMP ist ein moderner Standard
+               für erweiterte Metadaten.
             
             5. ORDNERSTRUKTUR
                Nach Monat (YYYY/MM):
@@ -614,7 +621,7 @@ public class TakeoutProcessorApp extends Application {
                  [Alle Dateien direkt im Hauptordner]
             
             HINWEISE:
-            - JPEG-Bilder erhalten EXIF-Metadaten
+            - JPEG-Bilder erhalten EXIF & XMP-Metadaten
             - Videos werden organisiert, aber Metadaten nicht geändert
             - Dateien ohne Metadaten landen im "Unknown_Date" Ordner
             - Der Vorgang kann bei vielen Dateien lange dauern

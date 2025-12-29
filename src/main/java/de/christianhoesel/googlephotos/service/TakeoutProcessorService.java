@@ -1,5 +1,9 @@
 package de.christianhoesel.googlephotos.service;
 
+import com.adobe.internal.xmp.XMPException;
+import com.adobe.internal.xmp.XMPMeta;
+import com.adobe.internal.xmp.XMPMetaFactory;
+import com.adobe.internal.xmp.options.SerializeOptions;
 import de.christianhoesel.googlephotos.model.GoogleTakeoutMetadata;
 import org.apache.commons.imaging.Imaging;
 import org.apache.commons.imaging.common.ImageMetadata;
@@ -344,17 +348,139 @@ public class TakeoutProcessorService {
         }
         
         // Write to destination file with EXIF
-        try (FileOutputStream fos = new FileOutputStream(destFile);
+        File tempFile = new File(destFile.getParentFile(), destFile.getName() + ".exif.tmp");
+        try (FileOutputStream fos = new FileOutputStream(tempFile);
              BufferedOutputStream bos = new BufferedOutputStream(fos)) {
             
             new ExifRewriter().updateExifMetadataLossless(sourceFile, bos, outputSet);
         }
         
-        // Note: IPTC metadata writing is not fully supported in commons-imaging alpha5
-        // The alpha version has limited/incomplete IPTC API. 
-        // For now, we rely on EXIF fields which work well for most metadata.
-        // Future enhancement: Consider using metadata-extractor or XMP libraries for IPTC support.
-        logger.debug("EXIF metadata written to: {}", destFile.getName());
+        // Now add XMP metadata
+        try {
+            writeXmpMetadata(tempFile, destFile, metadata, albumName);
+            // Delete temp file after successful XMP write
+            tempFile.delete();
+            logger.debug("EXIF and XMP metadata written to: {}", destFile.getName());
+        } catch (Exception e) {
+            logger.warn("Could not write XMP metadata for {}: {}. Using EXIF-only version.", 
+                sourceFile.getName(), e.getMessage());
+            // If XMP writing fails, just rename temp file to dest
+            if (!tempFile.renameTo(destFile)) {
+                Files.copy(tempFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                tempFile.delete();
+            }
+        }
+    }
+    
+    /**
+     * Writes XMP metadata to a JPEG file.
+     * XMP is a modern standard for storing extended metadata that doesn't fit well in EXIF.
+     */
+    private void writeXmpMetadata(
+        File sourceFile,
+        File destFile,
+        GoogleTakeoutMetadata metadata,
+        String albumName
+    ) throws Exception {
+        
+        // Read the source file
+        byte[] fileData = Files.readAllBytes(sourceFile.toPath());
+        
+        // Create XMP metadata
+        XMPMeta xmpMeta = XMPMetaFactory.create();
+        
+        // Dublin Core namespace for basic metadata
+        String dcNS = "http://purl.org/dc/elements/1.1/";
+        String xmpNS = "http://ns.adobe.com/xap/1.0/";
+        String lrNS = "http://ns.adobe.com/lightroom/1.0/";
+        
+        // Register namespaces
+        try {
+            XMPMetaFactory.getSchemaRegistry().registerNamespace(dcNS, "dc");
+            XMPMetaFactory.getSchemaRegistry().registerNamespace(xmpNS, "xmp");
+            XMPMetaFactory.getSchemaRegistry().registerNamespace(lrNS, "lr");
+        } catch (XMPException e) {
+            // Namespaces might already be registered
+        }
+        
+        // Add people as dc:subject (keywords)
+        if (metadata != null && metadata.getPeople() != null && !metadata.getPeople().isEmpty()) {
+            for (int i = 0; i < metadata.getPeople().size(); i++) {
+                GoogleTakeoutMetadata.Person person = metadata.getPeople().get(i);
+                if (person.getName() != null && !person.getName().trim().isEmpty()) {
+                    com.adobe.internal.xmp.options.PropertyOptions arrayOptions = 
+                        new com.adobe.internal.xmp.options.PropertyOptions();
+                    arrayOptions.setArray(true);
+                    xmpMeta.appendArrayItem(dcNS, "subject", arrayOptions, person.getName(), null);
+                    logger.debug("Added person '{}' to XMP keywords", person.getName());
+                }
+            }
+        }
+        
+        // Add album name
+        if (albumName != null && !albumName.trim().isEmpty()) {
+            xmpMeta.setProperty(lrNS, "hierarchicalSubject", albumName);
+            logger.debug("Added album '{}' to XMP", albumName);
+        }
+        
+        // Add title
+        if (metadata != null && metadata.getTitle() != null && !metadata.getTitle().trim().isEmpty()) {
+            xmpMeta.setLocalizedText(dcNS, "title", "x-default", "x-default", metadata.getTitle());
+        }
+        
+        // Add description
+        if (metadata != null && metadata.getDescription() != null && !metadata.getDescription().trim().isEmpty()) {
+            xmpMeta.setLocalizedText(dcNS, "description", "x-default", "x-default", metadata.getDescription());
+        }
+        
+        // Serialize XMP to string
+        SerializeOptions options = new SerializeOptions();
+        options.setUseCompactFormat(true);
+        options.setOmitPacketWrapper(true);
+        String xmpString = XMPMetaFactory.serializeToString(xmpMeta, options);
+        
+        // Insert XMP into JPEG
+        insertXmpIntoJpeg(fileData, xmpString, destFile);
+    }
+    
+    /**
+     * Inserts XMP metadata into a JPEG file.
+     * JPEG structure: SOI (0xFFD8) followed by segments (0xFFxx).
+     * XMP goes in APP1 segment (0xFFE1) with "http://ns.adobe.com/xap/1.0/\0" identifier.
+     */
+    private void insertXmpIntoJpeg(byte[] jpegData, String xmpString, File destFile) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(destFile);
+             BufferedOutputStream bos = new BufferedOutputStream(fos)) {
+            
+            // Write SOI marker
+            bos.write(0xFF);
+            bos.write(0xD8);
+            
+            // Prepare XMP packet
+            String xmpHeader = "http://ns.adobe.com/xap/1.0/\0";
+            byte[] xmpHeaderBytes = xmpHeader.getBytes("UTF-8");
+            byte[] xmpBytes = xmpString.getBytes("UTF-8");
+            
+            // Calculate segment size (header + xmp + 2 bytes for size itself)
+            int segmentSize = xmpHeaderBytes.length + xmpBytes.length + 2;
+            
+            // Write APP1 marker for XMP
+            bos.write(0xFF);
+            bos.write(0xE1);
+            
+            // Write segment size (big-endian)
+            bos.write((segmentSize >> 8) & 0xFF);
+            bos.write(segmentSize & 0xFF);
+            
+            // Write XMP header
+            bos.write(xmpHeaderBytes);
+            
+            // Write XMP data
+            bos.write(xmpBytes);
+            
+            // Write rest of JPEG data (skip SOI marker at start)
+            bos.write(jpegData, 2, jpegData.length - 2);
+        }
     }
     
     /**

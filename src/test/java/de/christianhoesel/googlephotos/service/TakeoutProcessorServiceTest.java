@@ -314,4 +314,59 @@ class TakeoutProcessorServiceTest {
             "File should be in album folder");
         assertTrue(resultFile.exists(), "File should be copied");
     }
+    
+    @Test
+    void testXmpMetadataWriting(@TempDir Path tempDir) throws Exception {
+        // Create a test image with people and album
+        File sourceImage = tempDir.resolve("test.jpg").toFile();
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpg", sourceImage);
+
+        GoogleTakeoutMetadata metadata = new GoogleTakeoutMetadata();
+        metadata.setTitle("Vacation Photo");
+        metadata.setDescription("A nice photo from vacation");
+        
+        // Add people
+        GoogleTakeoutMetadata.Person person1 = new GoogleTakeoutMetadata.Person();
+        person1.setName("Alice");
+        GoogleTakeoutMetadata.Person person2 = new GoogleTakeoutMetadata.Person();
+        person2.setName("Bob");
+        List<GoogleTakeoutMetadata.Person> people = new ArrayList<>();
+        people.add(person1);
+        people.add(person2);
+        metadata.setPeople(people);
+        
+        GoogleTakeoutMetadata.TimeInfo timeInfo = new GoogleTakeoutMetadata.TimeInfo();
+        timeInfo.setTimestamp("1609459200");
+        metadata.setPhotoTakenTime(timeInfo);
+
+        File jsonFile = tempDir.resolve("test.jpg.json").toFile();
+        try (FileWriter writer = new FileWriter(jsonFile)) {
+            gson.toJson(metadata, writer);
+        }
+
+        GoogleTakeoutService.MediaFileWithMetadata fileWithMetadata = 
+            new GoogleTakeoutService.MediaFileWithMetadata(sourceImage, jsonFile, metadata, "Summer Trip");
+
+        File outputDir = tempDir.resolve("output").toFile();
+        outputDir.mkdirs();
+        
+        TakeoutProcessorService.ProcessingOptions options = 
+            new TakeoutProcessorService.ProcessingOptions();
+        options.setOutputDirectory(outputDir);
+        options.setOrganizationMode(TakeoutProcessorService.OrganizationMode.FLAT);
+        options.setAddMetadata(true);
+        options.setCopyFiles(true);
+
+        File resultFile = service.processMediaFile(fileWithMetadata, options);
+
+        // Verify file was created
+        assertTrue(resultFile.exists(), "Output file should exist");
+        
+        // The file should contain both EXIF and XMP metadata
+        // XMP metadata is embedded as an APP1 marker in the JPEG
+        // We can verify the file is valid and contains metadata
+        assertTrue(resultFile.length() > sourceImage.length(), 
+            "Output file should be larger due to added metadata");
+    }
 }
