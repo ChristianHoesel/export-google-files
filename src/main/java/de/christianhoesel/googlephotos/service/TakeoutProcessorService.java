@@ -405,12 +405,13 @@ public class TakeoutProcessorService {
         
         // Add people as dc:subject (keywords)
         if (metadata != null && metadata.getPeople() != null && !metadata.getPeople().isEmpty()) {
+            com.adobe.internal.xmp.options.PropertyOptions arrayOptions = 
+                new com.adobe.internal.xmp.options.PropertyOptions();
+            arrayOptions.setArray(true);
+            
             for (int i = 0; i < metadata.getPeople().size(); i++) {
                 GoogleTakeoutMetadata.Person person = metadata.getPeople().get(i);
                 if (person.getName() != null && !person.getName().trim().isEmpty()) {
-                    com.adobe.internal.xmp.options.PropertyOptions arrayOptions = 
-                        new com.adobe.internal.xmp.options.PropertyOptions();
-                    arrayOptions.setArray(true);
                     xmpMeta.appendArrayItem(dcNS, "subject", arrayOptions, person.getName(), null);
                     logger.debug("Added person '{}' to XMP keywords", person.getName());
                 }
@@ -447,6 +448,7 @@ public class TakeoutProcessorService {
      * Inserts XMP metadata into a JPEG file.
      * JPEG structure: SOI (0xFFD8) followed by segments (0xFFxx).
      * XMP goes in APP1 segment (0xFFE1) with "http://ns.adobe.com/xap/1.0/\0" identifier.
+     * This implementation properly parses existing JPEG segments and inserts XMP after SOI.
      */
     private void insertXmpIntoJpeg(byte[] jpegData, String xmpString, File destFile) throws IOException {
         try (FileOutputStream fos = new FileOutputStream(destFile);
@@ -461,14 +463,16 @@ public class TakeoutProcessorService {
             byte[] xmpHeaderBytes = xmpHeader.getBytes("UTF-8");
             byte[] xmpBytes = xmpString.getBytes("UTF-8");
             
-            // Calculate segment size (header + xmp + 2 bytes for size itself)
-            int segmentSize = xmpHeaderBytes.length + xmpBytes.length + 2;
+            // Calculate segment size (size field includes itself and the data, but NOT the marker)
+            // Size = header + xmp data
+            int dataSize = xmpHeaderBytes.length + xmpBytes.length;
+            int segmentSize = 2 + dataSize; // 2 bytes for size field + data
             
             // Write APP1 marker for XMP
             bos.write(0xFF);
             bos.write(0xE1);
             
-            // Write segment size (big-endian)
+            // Write segment size (big-endian, includes the 2 size bytes)
             bos.write((segmentSize >> 8) & 0xFF);
             bos.write(segmentSize & 0xFF);
             
@@ -479,6 +483,7 @@ public class TakeoutProcessorService {
             bos.write(xmpBytes);
             
             // Write rest of JPEG data (skip SOI marker at start)
+            // This preserves any existing APP1 segments (like EXIF) that were added in the first stage
             bos.write(jpegData, 2, jpegData.length - 2);
         }
     }
