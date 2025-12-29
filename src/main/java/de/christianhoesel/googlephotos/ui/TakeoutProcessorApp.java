@@ -27,7 +27,17 @@ import java.util.concurrent.Executors;
  * Processes local Google Takeout exports, adds metadata to images, and organizes into monthly folders.
  */
 public class TakeoutProcessorApp extends Application {
-    private static final Logger logger = LoggerFactory.getLogger(TakeoutProcessorApp.class);
+    private static final String SECONDARY_BUTTON = "secondary-button";
+
+	private static final String DANGER_BUTTON = "danger-button";
+
+	private static final String PRIMARY_BUTTON = "primary-button";
+
+	private static final String GOOGLE_TAKEOUT_PROCESSOR = "Google Takeout Processor";
+
+	private static final String SYSTEM = "System";
+
+	private static final Logger logger = LoggerFactory.getLogger(TakeoutProcessorApp.class);
 
     private ExecutorService executorService;
     private Stage primaryStage;
@@ -54,7 +64,7 @@ public class TakeoutProcessorApp extends Application {
             return thread;
         });
 
-        primaryStage.setTitle("Google Takeout Processor");
+        primaryStage.setTitle(GOOGLE_TAKEOUT_PROCESSOR);
         primaryStage.setMinWidth(900);
         primaryStage.setMinHeight(650);
 
@@ -109,11 +119,11 @@ public class TakeoutProcessorApp extends Application {
         header.setPadding(new Insets(15, 25, 15, 25));
 
         Label logoLabel = new Label("📷");
-        logoLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
+        logoLabel.setFont(Font.font(SYSTEM, FontWeight.BOLD, 28));
 
-        Label titleLabel = new Label("Google Takeout Processor");
+        Label titleLabel = new Label(GOOGLE_TAKEOUT_PROCESSOR);
         titleLabel.getStyleClass().add("header-title");
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 22));
+        titleLabel.setFont(Font.font(SYSTEM, FontWeight.BOLD, 22));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -165,7 +175,7 @@ public class TakeoutProcessorApp extends Application {
         progressBar.setVisible(false);
 
         cancelButton = new Button("✖ Abbrechen");
-        cancelButton.getStyleClass().add("danger-button");
+        cancelButton.getStyleClass().add(DANGER_BUTTON);
         cancelButton.setVisible(false);
         cancelButton.setOnAction(e -> cancelCurrentTask());
 
@@ -179,15 +189,15 @@ public class TakeoutProcessorApp extends Application {
         welcomeBox.getStyleClass().add("welcome-screen");
 
         Label welcomeIcon = new Label("📦");
-        welcomeIcon.setFont(Font.font("System", 72));
+        welcomeIcon.setFont(Font.font(SYSTEM, 72));
 
-        Label welcomeTitle = new Label("Google Takeout Processor");
+        Label welcomeTitle = new Label(GOOGLE_TAKEOUT_PROCESSOR);
         welcomeTitle.getStyleClass().add("welcome-title");
-        welcomeTitle.setFont(Font.font("System", FontWeight.BOLD, 28));
+        welcomeTitle.setFont(Font.font(SYSTEM, FontWeight.BOLD, 28));
 
         Label welcomeSubtitle = new Label("Metadaten zu Bildern hinzufügen und in Monatsordner organisieren");
         welcomeSubtitle.getStyleClass().add("welcome-subtitle");
-        welcomeSubtitle.setFont(Font.font("System", 16));
+        welcomeSubtitle.setFont(Font.font(SYSTEM, 16));
         welcomeSubtitle.setWrapText(true);
         welcomeSubtitle.setMaxWidth(600);
         welcomeSubtitle.setAlignment(Pos.CENTER);
@@ -210,8 +220,8 @@ public class TakeoutProcessorApp extends Application {
         }
 
         Button startButton = new Button("⚙️ Verarbeitung starten");
-        startButton.getStyleClass().add("primary-button");
-        startButton.setFont(Font.font("System", FontWeight.BOLD, 16));
+        startButton.getStyleClass().add(PRIMARY_BUTTON);
+        startButton.setFont(Font.font(SYSTEM, FontWeight.BOLD, 16));
         startButton.setOnAction(e -> showProcessView());
 
         welcomeBox.getChildren().addAll(welcomeIcon, welcomeTitle, welcomeSubtitle, featureBox, startButton);
@@ -225,7 +235,7 @@ public class TakeoutProcessorApp extends Application {
 
         Label title = new Label("⚙️ Google Takeout verarbeiten");
         title.getStyleClass().add("view-title");
-        title.setFont(Font.font("System", FontWeight.BOLD, 24));
+        title.setFont(Font.font(SYSTEM, FontWeight.BOLD, 24));
 
         // Form
         GridPane form = new GridPane();
@@ -242,7 +252,7 @@ public class TakeoutProcessorApp extends Application {
         takeoutField.setPrefWidth(400);
         takeoutField.setEditable(false);
         Button browseTakeout = new Button("📂 Durchsuchen");
-        browseTakeout.getStyleClass().add("secondary-button");
+        browseTakeout.getStyleClass().add(SECONDARY_BUTTON);
         browseTakeout.setOnAction(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
             chooser.setTitle("Takeout-Verzeichnis wählen");
@@ -261,7 +271,7 @@ public class TakeoutProcessorApp extends Application {
         TextField outputField = new TextField(System.getProperty("user.home") + "/TakeoutOrganized");
         outputField.setPrefWidth(400);
         Button browseOutput = new Button("📂 Durchsuchen");
-        browseOutput.getStyleClass().add("secondary-button");
+        browseOutput.getStyleClass().add(SECONDARY_BUTTON);
         browseOutput.setOnAction(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
             chooser.setTitle("Ausgabeverzeichnis wählen");
@@ -316,7 +326,7 @@ public class TakeoutProcessorApp extends Application {
         buttonBox.setPadding(new Insets(20, 0, 0, 0));
 
         Button scanButton = new Button("🔍 Vorschau");
-        scanButton.getStyleClass().add("secondary-button");
+        scanButton.getStyleClass().add(SECONDARY_BUTTON);
         scanButton.setOnAction(e -> {
             if (takeoutDirectory == null) {
                 showError("Fehler", "Bitte wähle zuerst ein Takeout-Verzeichnis.");
@@ -326,7 +336,7 @@ public class TakeoutProcessorApp extends Application {
         });
 
         Button processButton = new Button("▶️ Verarbeiten");
-        processButton.getStyleClass().add("primary-button");
+        processButton.getStyleClass().add(PRIMARY_BUTTON);
         processButton.setOnAction(e -> {
             if (takeoutDirectory == null) {
                 showError("Fehler", "Bitte wähle zuerst ein Takeout-Verzeichnis.");
@@ -428,7 +438,7 @@ public class TakeoutProcessorApp extends Application {
 
         Label title = new Label("⚙️ Verarbeitung läuft...");
         title.getStyleClass().add("view-title");
-        title.setFont(Font.font("System", FontWeight.BOLD, 24));
+        title.setFont(Font.font(SYSTEM, FontWeight.BOLD, 24));
 
         ProgressBar procProgressBar = new ProgressBar(0);
         procProgressBar.setPrefWidth(500);
@@ -441,7 +451,7 @@ public class TakeoutProcessorApp extends Application {
         statsLabel.getStyleClass().add("stats-label");
 
         Button procCancelButton = new Button("❌ Abbrechen");
-        procCancelButton.getStyleClass().add("danger-button");
+        procCancelButton.getStyleClass().add(DANGER_BUTTON);
 
         progressView.getChildren().addAll(title, procProgressBar, progressLabel, statsLabel, procCancelButton);
         setContent(progressView);
@@ -513,8 +523,8 @@ public class TakeoutProcessorApp extends Application {
 
         processTask.setOnSucceeded(e -> {
             procCancelButton.setText("✓ Fertig - Zurück");
-            procCancelButton.getStyleClass().remove("danger-button");
-            procCancelButton.getStyleClass().add("primary-button");
+            procCancelButton.getStyleClass().remove(DANGER_BUTTON);
+            procCancelButton.getStyleClass().add(PRIMARY_BUTTON);
             procCancelButton.setOnAction(ev -> showProcessView());
             setStatus("Verarbeitung abgeschlossen");
             currentTask = null;
@@ -544,7 +554,7 @@ public class TakeoutProcessorApp extends Application {
 
         Label title = new Label("❓ Hilfe");
         title.getStyleClass().add("view-title");
-        title.setFont(Font.font("System", FontWeight.BOLD, 24));
+        title.setFont(Font.font(SYSTEM, FontWeight.BOLD, 24));
 
         TextArea helpText = new TextArea();
         helpText.setEditable(false);
