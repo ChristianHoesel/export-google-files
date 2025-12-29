@@ -1,8 +1,8 @@
 # Google Takeout Photos Organizer
 
-Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Verarbeiten von Google Takeout Exporten. Die App liest JSON-Metadaten, fügt sie zu Fotos und Videos hinzu und organisiert die Dateien in Monatsordner.
+Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Verarbeiten von Google Takeout Exporten. Die App liest JSON-Metadaten, schreibt sie als EXIF- und XMP-Metadaten in die Fotos und organisiert die Dateien flexibel nach Monat, Album oder flach.
 
-![Java Version](https://img.shields.io/badge/Java-17-orange)
+![Java Version](https://img.shields.io/badge/Java-21-orange)
 ![JavaFX](https://img.shields.io/badge/JavaFX-21-blue)
 ![License](https://img.shields.io/badge/License-Apache%202.0-green)
 ![Build](https://github.com/ChristianHoesel/export-google-files/actions/workflows/ci.yml/badge.svg)
@@ -15,11 +15,17 @@ Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Verarbeiten von Go
 - **Metadaten-Erhaltung und -Hinzufügung**:
   - Liest JSON-Metadaten von Google Takeout
   - Schreibt Aufnahmedatum/-zeit in EXIF-Daten (für JPEG-Bilder)
-  - Schreibt Beschreibungen in EXIF
+  - Schreibt Beschreibungen, Titel und Personen in EXIF und XMP
+  - Schreibt Album-Namen aus Ordnerstruktur in EXIF und XMP
   - Erhält Original-Metadaten
-- **Automatische Ordner-Organisation**
-  - Organisiert Dateien nach Monat (YYYY/MM)
-  - Basierend auf Aufnahmedatum aus Metadaten
+- **Flexible Organisation**:
+  - Nach Monat organisieren (YYYY/MM)
+  - Nach Album organisieren
+  - Flach in einem Verzeichnis (keine Unterordner)
+- **EXIF & XMP Metadaten**:
+  - Dual-Format für maximale Kompatibilität
+  - EXIF für Datum, Beschreibung, Titel
+  - XMP für Personen (dc:subject) und Album (lr:hierarchicalSubject)
 - **Fortschrittsanzeige** während der Verarbeitung
 - **Vorschau-Funktion** um zu sehen, was verarbeitet wird
 
@@ -43,11 +49,13 @@ Die Anwendung bietet eine moderne, benutzerfreundliche Oberfläche:
    - Starten Sie die Anwendung
    - Wählen Sie das entpackte Takeout-Verzeichnis
    - Wählen Sie ein Ausgabeverzeichnis
+   - Wählen Sie Organisation: Nach Monat, Nach Album oder Flach
+   - Wählen Sie ob EXIF & XMP Metadaten geschrieben werden sollen
    - Klicken Sie auf "Verarbeiten"
 
 3. **Ergebnis**:
-   - Dateien werden nach Monat organisiert (YYYY/MM)
-   - JPEG-Bilder erhalten EXIF-Metadaten (Datum, Beschreibung)
+   - Dateien werden organisiert (je nach gewählter Option)
+   - JPEG-Bilder erhalten EXIF & XMP Metadaten
    - Videos werden organisiert (Metadaten bleiben in JSON)
 
 ## Download & Verwendung
@@ -62,7 +70,7 @@ Laden Sie die passende ZIP-Datei für Ihr Betriebssystem herunter - **keine Inst
 | macOS | `TakeoutProcessor-macos.zip` | Entpacken → `TakeoutProcessor.app` starten |
 | Linux | `TakeoutProcessor-linux.zip` | Entpacken → `./TakeoutProcessor` ausführen |
 
-Die ZIP-Dateien enthalten das komplette JDK 17 - einfach entpacken und starten!
+Die ZIP-Dateien enthalten das komplette JDK 21 - einfach entpacken und starten!
 
 **Download:** Gehen Sie zu [Actions](../../actions) → Wählen Sie den neuesten erfolgreichen Build → Download Artifacts
 
@@ -70,7 +78,7 @@ Die ZIP-Dateien enthalten das komplette JDK 17 - einfach entpacken und starten!
 
 #### Voraussetzungen
 
-- **Java 17** oder höher
+- **Java 21** oder höher
 - Maven 3.6 oder höher
 
 #### Repository klonen
@@ -140,11 +148,18 @@ Die Anwendung hat ein übersichtliches Seitenmenü:
 
 - **Takeout-Verzeichnis** - Der entpackte Google Takeout Export-Ordner
 - **Ausgabeverzeichnis** - Wo die organisierten Dateien gespeichert werden
+- **Organisation** - Wählen Sie zwischen:
+  - **Nach Monat (YYYY/MM)** - Dateien in Jahres-/Monatsordner
+  - **Nach Album** - Dateien nach Album aus Ordnerstruktur
+  - **Flach** - Alle Dateien direkt im Ausgabeverzeichnis
+- **Metadaten** - EXIF & XMP Metadaten zu JPEG-Bildern hinzufügen (An/Aus)
 - **Modus** - Dateien kopieren oder verschieben
 
 ## Ausgabestruktur
 
-Die Dateien werden automatisch nach Monat organisiert:
+Die Dateien werden je nach gewählter Organisation organisiert:
+
+### Nach Monat (YYYY/MM)
 
 ```
 Ausgabeverzeichnis/
@@ -163,13 +178,47 @@ Ausgabeverzeichnis/
     └── ...
 ```
 
-### Metadaten in EXIF (JPEG-Bilder)
+### Nach Album
 
-Für JPEG-Bilder werden folgende Metadaten in EXIF geschrieben:
+```
+Ausgabeverzeichnis/
+├── Sommerurlaub/
+│   ├── IMG_001.jpg
+│   └── IMG_001.jpg.json
+├── Familienfotos/
+│   ├── IMG_002.jpg
+│   └── IMG_002.jpg.json
+└── No_Album/        (Dateien ohne Album)
+    └── ...
+```
 
-- **Aufnahmedatum/-zeit** (EXIF DateTimeOriginal)
-- **Digitalisierungsdatum** (EXIF DateTimeDigitized)
+### Flach
+
+```
+Ausgabeverzeichnis/
+├── IMG_001.jpg
+├── IMG_001.jpg.json
+├── IMG_002.jpg
+├── IMG_002.jpg.json
+└── ...
+```
+
+### Metadaten in EXIF & XMP (JPEG-Bilder)
+
+Für JPEG-Bilder werden Metadaten in beiden Formaten geschrieben:
+
+**EXIF-Felder:**
+- **Aufnahmedatum/-zeit** (EXIF DateTimeOriginal & DateTimeDigitized)
 - **Beschreibung** (TIFF ImageDescription)
+- **Titel** (TIFF DocumentName)
+- **Personen** (TIFF Software - Format: "People: Name1, Name2")
+- **Album** (TIFF Artist - Format: "Album: AlbumName")
+
+**XMP-Felder:**
+- **Personen** (dc:subject - Dublin Core Keywords, jeder Name einzeln)
+- **Album** (lr:hierarchicalSubject - Lightroom Namespace)
+- **Titel** (dc:title - Dublin Core)
+- **Beschreibung** (dc:description - Dublin Core)
 
 ### JSON-Metadaten-Dateien
 
@@ -240,9 +289,10 @@ mvn package
 
 ## Technologie-Stack
 
-- **Java 17** - Java LTS Version
+- **Java 21** - Java LTS Version
 - **JavaFX 21** - Moderne Desktop-GUI
-- **Apache Commons Imaging** - EXIF-Metadaten schreiben
+- **Apache Commons Imaging** - EXIF & XMP Metadaten schreiben
+- **Adobe XMP Core** - XMP-Packet-Generierung
 - **Gson** - JSON-Parsing
 - **Maven** - Build-Management
 - **SLF4J + Logback** - Logging
@@ -260,9 +310,8 @@ Diese Version wurde komplett umgebaut, um **lokal mit Google Takeout Exporten zu
 ## Bekannte Einschränkungen
 
 - GPS-Koordinaten werden aktuell nicht in EXIF geschrieben (Limitierung der Apache Commons Imaging Alpha-Version)
-- EXIF-Metadaten können nur für JPEG-Bilder geschrieben werden
-- Videos erhalten keine EXIF-Metadaten, behalten aber ihre JSON-Dateien
-- Personen-Tags aus Google Photos können nicht in EXIF geschrieben werden (Standard-Feature nicht verfügbar)
+- EXIF und XMP Metadaten können nur für JPEG-Bilder geschrieben werden
+- Videos erhalten keine EXIF/XMP-Metadaten, behalten aber ihre JSON-Dateien
 
 ## Lizenz
 
