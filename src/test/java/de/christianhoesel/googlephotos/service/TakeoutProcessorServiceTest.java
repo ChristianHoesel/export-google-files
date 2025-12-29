@@ -216,4 +216,64 @@ class TakeoutProcessorServiceTest {
             "File should be in root output directory when organization is disabled");
         assertTrue(resultFile.exists(), "File should be copied");
     }
+
+    @Test
+    void testAlbumMetadataWriting(@TempDir Path tempDir) throws Exception {
+        // Create a test image in an album folder
+        File albumDir = tempDir.resolve("My Vacation").toFile();
+        albumDir.mkdirs();
+        
+        File sourceImage = new File(albumDir, "test.jpg");
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpg", sourceImage);
+
+        // Create metadata
+        GoogleTakeoutMetadata metadata = new GoogleTakeoutMetadata();
+        metadata.setTitle("test.jpg");
+        metadata.setDescription("Vacation photo");
+        
+        GoogleTakeoutMetadata.TimeInfo timeInfo = new GoogleTakeoutMetadata.TimeInfo();
+        timeInfo.setTimestamp("1609459200");
+        metadata.setPhotoTakenTime(timeInfo);
+
+        File jsonFile = new File(albumDir, "test.jpg.json");
+        try (FileWriter writer = new FileWriter(jsonFile)) {
+            gson.toJson(metadata, writer);
+        }
+
+        // Create MediaFileWithMetadata with album name
+        GoogleTakeoutService.MediaFileWithMetadata fileWithMetadata = 
+            new GoogleTakeoutService.MediaFileWithMetadata(sourceImage, jsonFile, metadata, "My Vacation");
+
+        File outputDir = tempDir.resolve("output").toFile();
+        outputDir.mkdirs();
+        
+        TakeoutProcessorService.ProcessingOptions options = 
+            new TakeoutProcessorService.ProcessingOptions();
+        options.setOutputDirectory(outputDir);
+        options.setOrganizeByMonth(false);
+        options.setAddMetadata(true);
+        options.setCopyFiles(true);
+
+        File resultFile = service.processMediaFile(fileWithMetadata, options);
+
+        // Verify file was created
+        assertTrue(resultFile.exists(), "Output file should exist");
+
+        // Read EXIF and verify album was written
+        ImageMetadata imageMetadata = Imaging.getMetadata(resultFile);
+        if (imageMetadata instanceof JpegImageMetadata) {
+            JpegImageMetadata jpegMetadata = (JpegImageMetadata) imageMetadata;
+            TiffImageMetadata exif = jpegMetadata.getExif();
+            
+            if (exif != null) {
+                String[] artistArray = exif.getFieldValue(TiffTagConstants.TIFF_TAG_ARTIST);
+                if (artistArray != null && artistArray.length > 0) {
+                    String artist = artistArray[0];
+                    assertNotNull(artist, "Artist field should contain album data");
+                    assertTrue(artist.contains("My Vacation"), "Should contain album name 'My Vacation'");
+                }
+            }
+        }
+    }
 }

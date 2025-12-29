@@ -563,6 +563,10 @@ public class TakeoutProcessorApp extends Application {
                - Beschreibung (EXIF ImageDescription)
                - Titel (EXIF DocumentName)
                - Personen (EXIF Software als "People: Name1, Name2")
+               - Album (EXIF Artist als "Album: AlbumName")
+               
+               Hinweis: Album-Namen werden aus der Ordnerstruktur des
+               Takeout-Exports extrahiert.
             
             5. ORDNERSTRUKTUR
                Mit Monatsordner-Organisation:

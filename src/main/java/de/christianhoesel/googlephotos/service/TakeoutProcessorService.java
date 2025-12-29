@@ -88,6 +88,7 @@ public class TakeoutProcessorService {
     ) throws IOException {
         File mediaFile = fileWithMetadata.getMediaFile();
         GoogleTakeoutMetadata metadata = fileWithMetadata.getMetadata();
+        String albumName = fileWithMetadata.getAlbumName();
         
         logger.debug("Processing: {}", mediaFile.getName());
         
@@ -102,12 +103,11 @@ public class TakeoutProcessorService {
         
         // For JPEG images with metadata, write EXIF data
         if (options.isAddMetadata() && 
-            metadata != null && 
             fileWithMetadata.isImage() && 
             isJpeg(mediaFile)) {
             
             try {
-                writeExifMetadata(mediaFile, destFile, metadata);
+                writeExifMetadata(mediaFile, destFile, metadata, albumName);
                 logger.debug("Added EXIF metadata to: {}", destFile.getName());
             } catch (Exception e) {
                 logger.warn("Failed to write EXIF for {}: {}. Copying without metadata.", 
@@ -194,7 +194,8 @@ public class TakeoutProcessorService {
     private void writeExifMetadata(
         File sourceFile, 
         File destFile, 
-        GoogleTakeoutMetadata metadata
+        GoogleTakeoutMetadata metadata,
+        String albumName
     ) throws Exception {
         
         // Read existing metadata
@@ -276,6 +277,20 @@ public class TakeoutProcessorService {
                 rootDirectory.add(TiffTagConstants.TIFF_TAG_DOCUMENT_NAME, metadata.getTitle());
             } catch (Exception e) {
                 logger.debug("Could not write title to EXIF: {}", e.getMessage());
+            }
+        }
+        
+        // Write album name if available
+        // EXIF doesn't have a standard album field, but we can use XPKeywords or Artist field
+        // Many photo managers recognize Artist or Copyright fields for organization
+        if (albumName != null && !albumName.trim().isEmpty()) {
+            try {
+                // Use Artist field to store album name (common practice in photo management)
+                rootDirectory.removeField(TiffTagConstants.TIFF_TAG_ARTIST);
+                rootDirectory.add(TiffTagConstants.TIFF_TAG_ARTIST, "Album: " + albumName);
+                logger.debug("Added album '{}' to EXIF for {}", albumName, sourceFile.getName());
+            } catch (Exception e) {
+                logger.debug("Could not write album to EXIF: {}", e.getMessage());
             }
         }
         

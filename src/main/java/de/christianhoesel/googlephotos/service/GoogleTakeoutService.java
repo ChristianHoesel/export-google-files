@@ -7,8 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,11 +47,17 @@ public class GoogleTakeoutService {
         private final File mediaFile;
         private final File jsonFile;
         private final GoogleTakeoutMetadata metadata;
+        private final String albumName;
         
         public MediaFileWithMetadata(File mediaFile, File jsonFile, GoogleTakeoutMetadata metadata) {
+            this(mediaFile, jsonFile, metadata, null);
+        }
+        
+        public MediaFileWithMetadata(File mediaFile, File jsonFile, GoogleTakeoutMetadata metadata, String albumName) {
             this.mediaFile = mediaFile;
             this.jsonFile = jsonFile;
             this.metadata = metadata;
+            this.albumName = albumName;
         }
         
         public File getMediaFile() {
@@ -62,6 +70,10 @@ public class GoogleTakeoutService {
         
         public GoogleTakeoutMetadata getMetadata() {
             return metadata;
+        }
+        
+        public String getAlbumName() {
+            return albumName;
         }
         
         public boolean isImage() {
@@ -101,22 +113,23 @@ public class GoogleTakeoutService {
             
             logger.info("Found {} media files", mediaFiles.size());
             
-            // For each media file, find its JSON metadata
+            // For each media file, find its JSON metadata and extract album name
             for (File mediaFile : mediaFiles) {
+                String albumName = extractAlbumName(takeoutDirectory, mediaFile);
                 File jsonFile = findJsonForMediaFile(mediaFile);
                 if (jsonFile != null && jsonFile.exists()) {
                     try {
                         GoogleTakeoutMetadata metadata = parseMetadataFile(jsonFile);
-                        results.add(new MediaFileWithMetadata(mediaFile, jsonFile, metadata));
+                        results.add(new MediaFileWithMetadata(mediaFile, jsonFile, metadata, albumName));
                     } catch (Exception e) {
                         logger.warn("Failed to parse metadata for {}: {}", 
                             mediaFile.getName(), e.getMessage());
                         // Include the file anyway without metadata
-                        results.add(new MediaFileWithMetadata(mediaFile, null, null));
+                        results.add(new MediaFileWithMetadata(mediaFile, null, null, albumName));
                     }
                 } else {
                     logger.debug("No metadata file found for {}", mediaFile.getName());
-                    results.add(new MediaFileWithMetadata(mediaFile, null, null));
+                    results.add(new MediaFileWithMetadata(mediaFile, null, null, albumName));
                 }
             }
         }
@@ -138,6 +151,42 @@ public class GoogleTakeoutService {
         
         return IMAGE_EXTENSIONS.stream().anyMatch(name::endsWith) ||
                VIDEO_EXTENSIONS.stream().anyMatch(name::endsWith);
+    }
+    
+    /**
+     * Extracts album name from folder structure.
+     * Google Takeout organizes photos in folders that represent albums.
+     * If the file is not in the root takeout directory, the parent folder name is considered the album.
+     */
+    private String extractAlbumName(File takeoutRoot, File mediaFile) {
+        File parentDir = mediaFile.getParentFile();
+        if (parentDir == null || parentDir.equals(takeoutRoot)) {
+            return null; // No album (file in root)
+        }
+        
+        // Get the immediate parent folder name as album name
+        String albumName = parentDir.getName();
+        
+        // Ignore common Google Takeout folder names that aren't albums
+        if (albumName.equals("Google Photos") || 
+            albumName.equals("Takeout") ||
+            albumName.equals("Photos from") ||
+            albumName.matches("\\d{4}") || // Year folders like "2023"
+            albumName.matches("\\d{4}-\\d{2}-\\d{2}")) { // Date folders
+            
+            // Check if there's a grandparent folder that might be the album
+            File grandParent = parentDir.getParentFile();
+            if (grandParent != null && !grandParent.equals(takeoutRoot)) {
+                String grandParentName = grandParent.getName();
+                if (!grandParentName.equals("Google Photos") && 
+                    !grandParentName.equals("Takeout")) {
+                    return grandParentName;
+                }
+            }
+            return null;
+        }
+        
+        return albumName;
     }
     
     /**
@@ -184,7 +233,9 @@ public class GoogleTakeoutService {
      * Parses a Google Takeout JSON metadata file.
      */
     private GoogleTakeoutMetadata parseMetadataFile(File jsonFile) throws IOException {
-        try (FileReader reader = new FileReader(jsonFile)) {
+        // Use UTF-8 explicitly to handle special characters correctly
+        try (java.io.InputStreamReader reader = new java.io.InputStreamReader(
+                new java.io.FileInputStream(jsonFile), java.nio.charset.StandardCharsets.UTF_8)) {
             return gson.fromJson(reader, GoogleTakeoutMetadata.class);
         }
     }
