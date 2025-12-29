@@ -148,7 +148,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>de.christianhoesel.googlephotos.ui.GooglePhotosApp</mainClass>
+                    <mainClass>de.christianhoesel.googlephotos.ui.TakeoutProcessorApp</mainClass>
                 </configuration>
             </plugin>
             <plugin>
