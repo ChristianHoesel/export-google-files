@@ -9,6 +9,7 @@ import org.apache.commons.imaging.Imaging;
 import org.apache.commons.imaging.common.ImageMetadata;
 import org.apache.commons.imaging.formats.jpeg.JpegImageMetadata;
 import org.apache.commons.imaging.formats.jpeg.exif.ExifRewriter;
+import org.apache.commons.imaging.formats.jpeg.xmp.JpegXmpRewriter;
 import org.apache.commons.imaging.formats.tiff.TiffImageMetadata;
 import org.apache.commons.imaging.formats.tiff.constants.*;
 import org.apache.commons.imaging.formats.tiff.taginfos.TagInfo;
@@ -373,7 +374,7 @@ public class TakeoutProcessorService {
     }
     
     /**
-     * Writes XMP metadata to a JPEG file.
+     * Writes XMP metadata to a JPEG file using JpegXmpRewriter.
      * XMP is a modern standard for storing extended metadata that doesn't fit well in EXIF.
      */
     private void writeXmpMetadata(
@@ -382,9 +383,6 @@ public class TakeoutProcessorService {
         GoogleTakeoutMetadata metadata,
         String albumName
     ) throws Exception {
-        
-        // Read the source file
-        byte[] fileData = Files.readAllBytes(sourceFile.toPath());
         
         // Create XMP metadata
         XMPMeta xmpMeta = XMPMetaFactory.create();
@@ -435,56 +433,19 @@ public class TakeoutProcessorService {
         }
         
         // Serialize XMP to string
-        SerializeOptions options = new SerializeOptions();
-        options.setUseCompactFormat(true);
-        options.setOmitPacketWrapper(true);
-        String xmpString = XMPMetaFactory.serializeToString(xmpMeta, options);
+        SerializeOptions serializeOptions = new SerializeOptions();
+        serializeOptions.setUseCompactFormat(true);
+        serializeOptions.setOmitPacketWrapper(true);
+        String xmpXml = XMPMetaFactory.serializeToString(xmpMeta, serializeOptions);
         
-        // Insert XMP into JPEG
-        insertXmpIntoJpeg(fileData, xmpString, destFile);
-    }
-    
-    /**
-     * Inserts XMP metadata into a JPEG file.
-     * JPEG structure: SOI (0xFFD8) followed by segments (0xFFxx).
-     * XMP goes in APP1 segment (0xFFE1) with "http://ns.adobe.com/xap/1.0/\0" identifier.
-     * This implementation properly parses existing JPEG segments and inserts XMP after SOI.
-     */
-    private void insertXmpIntoJpeg(byte[] jpegData, String xmpString, File destFile) throws IOException {
-        try (FileOutputStream fos = new FileOutputStream(destFile);
+        // Use JpegXmpRewriter to properly insert XMP into JPEG
+        JpegXmpRewriter xmpRewriter = new JpegXmpRewriter();
+        try (FileInputStream fis = new FileInputStream(sourceFile);
+             FileOutputStream fos = new FileOutputStream(destFile);
              BufferedOutputStream bos = new BufferedOutputStream(fos)) {
             
-            // Write SOI marker
-            bos.write(0xFF);
-            bos.write(0xD8);
-            
-            // Prepare XMP packet
-            String xmpHeader = "http://ns.adobe.com/xap/1.0/\0";
-            byte[] xmpHeaderBytes = xmpHeader.getBytes("UTF-8");
-            byte[] xmpBytes = xmpString.getBytes("UTF-8");
-            
-            // Calculate segment size (size field includes itself and the data, but NOT the marker)
-            // Size = header + xmp data
-            int dataSize = xmpHeaderBytes.length + xmpBytes.length;
-            int segmentSize = 2 + dataSize; // 2 bytes for size field + data
-            
-            // Write APP1 marker for XMP
-            bos.write(0xFF);
-            bos.write(0xE1);
-            
-            // Write segment size (big-endian, includes the 2 size bytes)
-            bos.write((segmentSize >> 8) & 0xFF);
-            bos.write(segmentSize & 0xFF);
-            
-            // Write XMP header
-            bos.write(xmpHeaderBytes);
-            
-            // Write XMP data
-            bos.write(xmpBytes);
-            
-            // Write rest of JPEG data (skip SOI marker at start)
-            // This preserves any existing APP1 segments (like EXIF) that were added in the first stage
-            bos.write(jpegData, 2, jpegData.length - 2);
+            xmpRewriter.updateXmpXml(fis, bos, xmpXml);
+            logger.debug("XMP metadata written using JpegXmpRewriter to: {}", destFile.getName());
         }
     }
     
