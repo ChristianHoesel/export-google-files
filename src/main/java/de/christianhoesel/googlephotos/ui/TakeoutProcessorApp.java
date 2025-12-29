@@ -41,6 +41,8 @@ public class TakeoutProcessorApp extends Application {
     private File takeoutDirectory;
     private File outputDirectory;
     private boolean copyFiles = true;
+    private boolean organizeByMonth = true;
+    private boolean addMetadata = true;
 
     @Override
     public void start(Stage primaryStage) {
@@ -279,6 +281,22 @@ public class TakeoutProcessorApp extends Application {
         form.add(modeLabel, 0, row);
         form.add(copyCheck, 1, row++);
 
+        // Organization options
+        Label organizeLabel = new Label("Organisation:");
+        CheckBox organizeByMonthCheck = new CheckBox("In Monatsordner organisieren (YYYY/MM)");
+        organizeByMonthCheck.setSelected(true);
+        organizeByMonthCheck.setTooltip(new Tooltip("Dateien werden nach Aufnahmedatum in YYYY/MM Ordner sortiert"));
+        form.add(organizeLabel, 0, row);
+        form.add(organizeByMonthCheck, 1, row++);
+
+        // Metadata options
+        Label metadataLabel = new Label("Metadaten:");
+        CheckBox addMetadataCheck = new CheckBox("EXIF-Metadaten zu Bildern hinzufügen");
+        addMetadataCheck.setSelected(true);
+        addMetadataCheck.setTooltip(new Tooltip("Schreibt Datum, Beschreibung, Titel und Personen in EXIF-Daten"));
+        form.add(metadataLabel, 0, row);
+        form.add(addMetadataCheck, 1, row++);
+
         // Buttons
         HBox buttonBox = new HBox(15);
         buttonBox.setAlignment(Pos.CENTER);
@@ -307,6 +325,8 @@ public class TakeoutProcessorApp extends Application {
             }
             outputDirectory = new File(outputField.getText());
             copyFiles = copyCheck.isSelected();
+            organizeByMonth = organizeByMonthCheck.isSelected();
+            addMetadata = addMetadataCheck.isSelected();
             startProcessing();
         });
 
@@ -426,8 +446,8 @@ public class TakeoutProcessorApp extends Application {
                     new TakeoutProcessorService.ProcessingOptions();
                 options.setOutputDirectory(outputDirectory);
                 options.setCopyFiles(copyFiles);
-                options.setAddMetadata(true);
-                options.setOrganizeByMonth(true);
+                options.setAddMetadata(addMetadata);
+                options.setOrganizeByMonth(organizeByMonth);
 
                 processorService.processAllFiles(files, options, new TakeoutProcessorService.ProgressCallback() {
                     @Override
@@ -521,6 +541,10 @@ public class TakeoutProcessorApp extends Application {
                - Klicke auf "Verarbeiten" im Menü
                - Wähle das entpackte Takeout-Verzeichnis
                - Wähle ein Ausgabeverzeichnis
+               - Wähle die gewünschten Optionen:
+                 * Kopieren/Verschieben
+                 * Monatsordner-Organisation
+                 * EXIF-Metadaten hinzufügen
                - Klicke auf "Vorschau" um zu sehen, was gefunden wurde
                - Klicke auf "Verarbeiten" um zu starten
             
@@ -528,19 +552,20 @@ public class TakeoutProcessorApp extends Application {
                Die App:
                - Scannt alle Bilder und Videos im Takeout-Ordner
                - Liest die JSON-Metadaten-Dateien
-               - Schreibt Datum/Zeit in EXIF-Daten (für JPEGs)
-               - Organisiert Dateien in Monatsordner (YYYY/MM)
+               - Schreibt optional Datum/Zeit/Personen in EXIF-Daten (für JPEGs)
+               - Organisiert optional Dateien in Monatsordner (YYYY/MM)
                - Kopiert oder verschiebt die Dateien
             
             4. METADATEN
-               Folgende Metadaten werden verarbeitet:
-               - Aufnahmedatum/-zeit
-               - Erstellungsdatum/-zeit
-               - Beschreibung (wenn vorhanden)
-               - GPS-Koordinaten (aktuell nicht unterstützt)
+               Folgende Metadaten werden verarbeitet (wenn aktiviert):
+               - Aufnahmedatum/-zeit (EXIF DateTimeOriginal)
+               - Erstellungsdatum/-zeit (EXIF DateTimeDigitized)
+               - Beschreibung (EXIF ImageDescription)
+               - Titel (EXIF DocumentName)
+               - Personen/People (EXIF Software als "People: Name1, Name2")
             
             5. ORDNERSTRUKTUR
-               Ausgabe:
+               Mit Monatsordner-Organisation:
                <Ausgabeverzeichnis>/
                  2021/
                    01/  (Januar 2021)
@@ -548,6 +573,10 @@ public class TakeoutProcessorApp extends Application {
                  2022/
                    12/  (Dezember 2022)
                  Unknown_Date/  (Dateien ohne Datum)
+               
+               Ohne Monatsordner-Organisation:
+               <Ausgabeverzeichnis>/
+                 [Alle Dateien direkt im Hauptordner]
             
             HINWEISE:
             - JPEG-Bilder erhalten EXIF-Metadaten

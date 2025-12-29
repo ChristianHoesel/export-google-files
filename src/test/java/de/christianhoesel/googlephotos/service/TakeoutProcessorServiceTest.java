@@ -178,4 +178,42 @@ class TakeoutProcessorServiceTest {
         assertTrue(path.contains("Unknown_Date"), "Path should contain Unknown_Date folder");
         assertTrue(resultFile.exists(), "File should be copied");
     }
+
+    @Test
+    void testOrganizeByMonthDisabled(@TempDir Path tempDir) throws Exception {
+        // Create a test file with date metadata
+        File sourceImage = tempDir.resolve("test.jpg").toFile();
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpg", sourceImage);
+
+        GoogleTakeoutMetadata metadata = new GoogleTakeoutMetadata();
+        GoogleTakeoutMetadata.TimeInfo timeInfo = new GoogleTakeoutMetadata.TimeInfo();
+        timeInfo.setTimestamp("1609459200"); // Jan 1, 2021
+        metadata.setPhotoTakenTime(timeInfo);
+
+        File jsonFile = tempDir.resolve("test.jpg.json").toFile();
+        try (FileWriter writer = new FileWriter(jsonFile)) {
+            gson.toJson(metadata, writer);
+        }
+
+        GoogleTakeoutService.MediaFileWithMetadata fileWithMetadata = 
+            new GoogleTakeoutService.MediaFileWithMetadata(sourceImage, jsonFile, metadata);
+
+        File outputDir = tempDir.resolve("output").toFile();
+        outputDir.mkdirs();
+        
+        TakeoutProcessorService.ProcessingOptions options = 
+            new TakeoutProcessorService.ProcessingOptions();
+        options.setOutputDirectory(outputDir);
+        options.setOrganizeByMonth(false); // Disable organization
+        options.setAddMetadata(true);
+        options.setCopyFiles(true);
+
+        File resultFile = service.processMediaFile(fileWithMetadata, options);
+
+        // Check that file is in the root output directory, not in a dated subfolder
+        assertEquals(outputDir, resultFile.getParentFile(), 
+            "File should be in root output directory when organization is disabled");
+        assertTrue(resultFile.exists(), "File should be copied");
+    }
 }
