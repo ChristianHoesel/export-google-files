@@ -562,7 +562,7 @@ public class TakeoutProcessorApp extends Application {
                - Erstellungsdatum/-zeit (EXIF DateTimeDigitized)
                - Beschreibung (EXIF ImageDescription)
                - Titel (EXIF DocumentName)
-               - Personen/People (EXIF Software als "People: Name1, Name2")
+               - Personen (EXIF Software als "People: Name1, Name2")
             
             5. ORDNERSTRUKTUR
                Mit Monatsordner-Organisation:
