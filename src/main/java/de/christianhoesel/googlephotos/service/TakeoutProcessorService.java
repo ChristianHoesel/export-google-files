@@ -257,7 +257,7 @@ public class TakeoutProcessorService {
             }
             
             // Store people in the Software field (not ideal but works for preservation)
-            String peopleTag = "People: " + peopleStr.toString();
+            String peopleTag = "People: " + peopleStr;
             try {
                 rootDirectory.removeField(TiffTagConstants.TIFF_TAG_SOFTWARE);
                 rootDirectory.add(TiffTagConstants.TIFF_TAG_SOFTWARE, peopleTag);
