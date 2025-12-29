@@ -20,11 +20,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -197,6 +192,8 @@ public class TakeoutProcessorService {
     
     /**
      * Old method for backwards compatibility - delegates to new method.
+     * @deprecated Use {@link #determineDestinationDirectory(GoogleTakeoutMetadata, String, ProcessingOptions)} instead.
+     *             This method will be removed in a future version.
      */
     @Deprecated
     private File determineDestinationDirectory(
