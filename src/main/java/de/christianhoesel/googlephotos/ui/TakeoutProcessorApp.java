@@ -41,7 +41,7 @@ public class TakeoutProcessorApp extends Application {
     private File takeoutDirectory;
     private File outputDirectory;
     private boolean copyFiles = true;
-    private boolean organizeByMonth = true;
+    private TakeoutProcessorService.OrganizationMode organizationMode = TakeoutProcessorService.OrganizationMode.BY_MONTH;
     private boolean addMetadata = true;
 
     @Override
@@ -281,19 +281,32 @@ public class TakeoutProcessorApp extends Application {
         form.add(modeLabel, 0, row);
         form.add(copyCheck, 1, row++);
 
-        // Organization options
+        // Organization options with radio buttons
         Label organizeLabel = new Label("Organisation:");
-        CheckBox organizeByMonthCheck = new CheckBox("In Monatsordner organisieren (YYYY/MM)");
-        organizeByMonthCheck.setSelected(true);
-        organizeByMonthCheck.setTooltip(new Tooltip("Dateien werden nach Aufnahmedatum in YYYY/MM Ordner sortiert"));
+        ToggleGroup organizationGroup = new ToggleGroup();
+        
+        RadioButton organizeByMonthRadio = new RadioButton("Nach Monat (YYYY/MM)");
+        organizeByMonthRadio.setToggleGroup(organizationGroup);
+        organizeByMonthRadio.setSelected(true);
+        organizeByMonthRadio.setTooltip(new Tooltip("Dateien nach Aufnahmedatum in Jahr/Monat Ordner sortieren"));
+        
+        RadioButton organizeByAlbumRadio = new RadioButton("Nach Album");
+        organizeByAlbumRadio.setToggleGroup(organizationGroup);
+        organizeByAlbumRadio.setTooltip(new Tooltip("Dateien nach Album-Namen aus Ordnerstruktur sortieren"));
+        
+        RadioButton organizeFlatRadio = new RadioButton("Flach (keine Unterordner)");
+        organizeFlatRadio.setToggleGroup(organizationGroup);
+        organizeFlatRadio.setTooltip(new Tooltip("Alle Dateien direkt im Ausgabeverzeichnis"));
+        
+        VBox organizationBox = new VBox(5, organizeByMonthRadio, organizeByAlbumRadio, organizeFlatRadio);
         form.add(organizeLabel, 0, row);
-        form.add(organizeByMonthCheck, 1, row++);
+        form.add(organizationBox, 1, row++);
 
         // Metadata options
         Label metadataLabel = new Label("Metadaten:");
         CheckBox addMetadataCheck = new CheckBox("EXIF-Metadaten zu Bildern hinzufügen");
         addMetadataCheck.setSelected(true);
-        addMetadataCheck.setTooltip(new Tooltip("Schreibt Datum, Beschreibung, Titel und Personen in EXIF-Daten"));
+        addMetadataCheck.setTooltip(new Tooltip("Schreibt Datum, Beschreibung, Titel, Personen und Album in EXIF"));
         form.add(metadataLabel, 0, row);
         form.add(addMetadataCheck, 1, row++);
 
@@ -325,7 +338,16 @@ public class TakeoutProcessorApp extends Application {
             }
             outputDirectory = new File(outputField.getText());
             copyFiles = copyCheck.isSelected();
-            organizeByMonth = organizeByMonthCheck.isSelected();
+            
+            // Determine organization mode from radio buttons
+            if (organizeByMonthRadio.isSelected()) {
+                organizationMode = TakeoutProcessorService.OrganizationMode.BY_MONTH;
+            } else if (organizeByAlbumRadio.isSelected()) {
+                organizationMode = TakeoutProcessorService.OrganizationMode.BY_ALBUM;
+            } else {
+                organizationMode = TakeoutProcessorService.OrganizationMode.FLAT;
+            }
+            
             addMetadata = addMetadataCheck.isSelected();
             startProcessing();
         });
@@ -447,7 +469,7 @@ public class TakeoutProcessorApp extends Application {
                 options.setOutputDirectory(outputDirectory);
                 options.setCopyFiles(copyFiles);
                 options.setAddMetadata(addMetadata);
-                options.setOrganizeByMonth(organizeByMonth);
+                options.setOrganizationMode(organizationMode);
 
                 processorService.processAllFiles(files, options, new TakeoutProcessorService.ProgressCallback() {
                     @Override
@@ -543,7 +565,7 @@ public class TakeoutProcessorApp extends Application {
                - Wähle ein Ausgabeverzeichnis
                - Wähle die gewünschten Optionen:
                  * Kopieren/Verschieben
-                 * Monatsordner-Organisation
+                 * Organisation: Nach Monat / Nach Album / Flach
                  * EXIF-Metadaten hinzufügen
                - Klicke auf "Vorschau" um zu sehen, was gefunden wurde
                - Klicke auf "Verarbeiten" um zu starten
@@ -552,12 +574,14 @@ public class TakeoutProcessorApp extends Application {
                Die App:
                - Scannt alle Bilder und Videos im Takeout-Ordner
                - Liest die JSON-Metadaten-Dateien
-               - Schreibt optional Datum/Zeit/Personen in EXIF-Daten (für JPEGs)
-               - Organisiert optional Dateien in Monatsordner (YYYY/MM)
+               - Schreibt optional Metadaten in EXIF (für JPEGs)
+               - Organisiert Dateien nach gewählter Option
                - Kopiert oder verschiebt die Dateien
             
             4. METADATEN
                Folgende Metadaten werden verarbeitet (wenn aktiviert):
+               
+               EXIF-Felder:
                - Aufnahmedatum/-zeit (EXIF DateTimeOriginal)
                - Erstellungsdatum/-zeit (EXIF DateTimeDigitized)
                - Beschreibung (EXIF ImageDescription)
@@ -569,7 +593,7 @@ public class TakeoutProcessorApp extends Application {
                Takeout-Exports extrahiert.
             
             5. ORDNERSTRUKTUR
-               Mit Monatsordner-Organisation:
+               Nach Monat (YYYY/MM):
                <Ausgabeverzeichnis>/
                  2021/
                    01/  (Januar 2021)
@@ -578,7 +602,14 @@ public class TakeoutProcessorApp extends Application {
                    12/  (Dezember 2022)
                  Unknown_Date/  (Dateien ohne Datum)
                
-               Ohne Monatsordner-Organisation:
+               Nach Album:
+               <Ausgabeverzeichnis>/
+                 Sommerurlaub/
+                 Familienfotos/
+                 Geburtstag 2023/
+                 No_Album/  (Dateien ohne Album)
+               
+               Flach (keine Unterordner):
                <Ausgabeverzeichnis>/
                  [Alle Dateien direkt im Hauptordner]
             

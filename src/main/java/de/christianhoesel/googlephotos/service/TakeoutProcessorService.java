@@ -20,6 +20,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -33,13 +38,22 @@ public class TakeoutProcessorService {
     private final AtomicInteger skippedCount = new AtomicInteger(0);
     
     /**
+     * Organization mode for files.
+     */
+    public enum OrganizationMode {
+        BY_MONTH,      // Organize into YYYY/MM folders
+        BY_ALBUM,      // Organize into album folders
+        FLAT           // All files in root output directory
+    }
+    
+    /**
      * Processing options.
      */
     public static class ProcessingOptions {
         private File outputDirectory;
         private boolean copyFiles = true; // true = copy, false = move
         private boolean addMetadata = true;
-        private boolean organizeByMonth = true;
+        private OrganizationMode organizationMode = OrganizationMode.BY_MONTH;
         
         public File getOutputDirectory() {
             return outputDirectory;
@@ -65,12 +79,25 @@ public class TakeoutProcessorService {
             this.addMetadata = addMetadata;
         }
         
+        public OrganizationMode getOrganizationMode() {
+            return organizationMode;
+        }
+        
+        public void setOrganizationMode(OrganizationMode organizationMode) {
+            this.organizationMode = organizationMode;
+        }
+        
+        // Backwards compatibility helpers
         public boolean isOrganizeByMonth() {
-            return organizeByMonth;
+            return organizationMode == OrganizationMode.BY_MONTH;
         }
         
         public void setOrganizeByMonth(boolean organizeByMonth) {
-            this.organizeByMonth = organizeByMonth;
+            if (organizeByMonth) {
+                this.organizationMode = OrganizationMode.BY_MONTH;
+            } else {
+                this.organizationMode = OrganizationMode.FLAT;
+            }
         }
     }
     
@@ -93,7 +120,7 @@ public class TakeoutProcessorService {
         logger.debug("Processing: {}", mediaFile.getName());
         
         // Determine destination path
-        File destDir = determineDestinationDirectory(metadata, options);
+        File destDir = determineDestinationDirectory(metadata, albumName, options);
         destDir.mkdirs();
         
         File destFile = new File(destDir, mediaFile.getName());
@@ -129,30 +156,54 @@ public class TakeoutProcessorService {
     }
     
     /**
-     * Determines the destination directory based on metadata and options.
+     * Determines the destination directory based on metadata, album, and options.
      */
     private File determineDestinationDirectory(
-        GoogleTakeoutMetadata metadata, 
+        GoogleTakeoutMetadata metadata,
+        String albumName,
         ProcessingOptions options
     ) {
         File baseDir = options.getOutputDirectory();
         
-        if (!options.isOrganizeByMonth()) {
-            return baseDir;
+        switch (options.getOrganizationMode()) {
+            case BY_ALBUM:
+                // Organize by album
+                if (albumName != null && !albumName.trim().isEmpty()) {
+                    return new File(baseDir, albumName);
+                } else {
+                    // No album, put in "No_Album" folder
+                    return new File(baseDir, "No_Album");
+                }
+                
+            case BY_MONTH:
+                // Organize by year/month
+                LocalDateTime dateTime = extractDateTime(metadata);
+                if (dateTime != null) {
+                    // Create YYYY/MM folder structure
+                    String year = String.valueOf(dateTime.getYear());
+                    String month = String.format("%02d", dateTime.getMonthValue());
+                    return new File(new File(baseDir, year), month);
+                } else {
+                    // No date available, put in "Unknown_Date" folder
+                    return new File(baseDir, "Unknown_Date");
+                }
+                
+            case FLAT:
+            default:
+                // All files in root directory
+                return baseDir;
         }
-        
-        // Try to get date from metadata
-        LocalDateTime dateTime = extractDateTime(metadata);
-        
-        if (dateTime != null) {
-            // Create YYYY/MM folder structure
-            String year = String.valueOf(dateTime.getYear());
-            String month = String.format("%02d", dateTime.getMonthValue());
-            return new File(new File(baseDir, year), month);
-        } else {
-            // No date available, put in "Unknown" folder
-            return new File(baseDir, "Unknown_Date");
-        }
+    }
+    
+    /**
+     * Old method for backwards compatibility - delegates to new method.
+     */
+    @Deprecated
+    private File determineDestinationDirectory(
+        GoogleTakeoutMetadata metadata, 
+        ProcessingOptions options
+    ) {
+        return determineDestinationDirectory(metadata, null, options);
     }
     
     /**
@@ -295,12 +346,18 @@ public class TakeoutProcessorService {
             }
         }
         
-        // Write to destination file
+        // Write to destination file with EXIF
         try (FileOutputStream fos = new FileOutputStream(destFile);
              BufferedOutputStream bos = new BufferedOutputStream(fos)) {
             
             new ExifRewriter().updateExifMetadataLossless(sourceFile, bos, outputSet);
         }
+        
+        // Note: IPTC metadata writing is not fully supported in commons-imaging alpha5
+        // The alpha version has limited/incomplete IPTC API. 
+        // For now, we rely on EXIF fields which work well for most metadata.
+        // Future enhancement: Consider using metadata-extractor or XMP libraries for IPTC support.
+        logger.debug("EXIF metadata written to: {}", destFile.getName());
     }
     
     /**

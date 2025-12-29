@@ -251,7 +251,7 @@ class TakeoutProcessorServiceTest {
         TakeoutProcessorService.ProcessingOptions options = 
             new TakeoutProcessorService.ProcessingOptions();
         options.setOutputDirectory(outputDir);
-        options.setOrganizeByMonth(false);
+        options.setOrganizationMode(TakeoutProcessorService.OrganizationMode.FLAT);
         options.setAddMetadata(true);
         options.setCopyFiles(true);
 
@@ -275,5 +275,43 @@ class TakeoutProcessorServiceTest {
                 }
             }
         }
+    }
+    
+    @Test
+    void testOrganizeByAlbumMode(@TempDir Path tempDir) throws Exception {
+        // Create a test file with album
+        File sourceImage = tempDir.resolve("test.jpg").toFile();
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpg", sourceImage);
+
+        GoogleTakeoutMetadata metadata = new GoogleTakeoutMetadata();
+        GoogleTakeoutMetadata.TimeInfo timeInfo = new GoogleTakeoutMetadata.TimeInfo();
+        timeInfo.setTimestamp("1609459200");
+        metadata.setPhotoTakenTime(timeInfo);
+
+        File jsonFile = tempDir.resolve("test.jpg.json").toFile();
+        try (FileWriter writer = new FileWriter(jsonFile)) {
+            gson.toJson(metadata, writer);
+        }
+
+        GoogleTakeoutService.MediaFileWithMetadata fileWithMetadata = 
+            new GoogleTakeoutService.MediaFileWithMetadata(sourceImage, jsonFile, metadata, "Summer 2023");
+
+        File outputDir = tempDir.resolve("output").toFile();
+        outputDir.mkdirs();
+        
+        TakeoutProcessorService.ProcessingOptions options = 
+            new TakeoutProcessorService.ProcessingOptions();
+        options.setOutputDirectory(outputDir);
+        options.setOrganizationMode(TakeoutProcessorService.OrganizationMode.BY_ALBUM);
+        options.setAddMetadata(false);
+        options.setCopyFiles(true);
+
+        File resultFile = service.processMediaFile(fileWithMetadata, options);
+
+        // Check that file is in album folder
+        assertEquals("Summer 2023", resultFile.getParentFile().getName(), 
+            "File should be in album folder");
+        assertTrue(resultFile.exists(), "File should be copied");
     }
 }
