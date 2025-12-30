@@ -43,6 +43,9 @@ public class TakeoutProcessorService {
 	private final AtomicInteger successCount = new AtomicInteger(0);
 	private final AtomicInteger errorCount = new AtomicInteger(0);
 	private final AtomicInteger skippedCount = new AtomicInteger(0);
+	
+	private final MotionPhotoExtractor motionPhotoExtractor = new MotionPhotoExtractor();
+	private final VideoMetadataWriter videoMetadataWriter = new VideoMetadataWriter();
 
 	/**
 	 * Organization mode for files.
@@ -61,6 +64,8 @@ public class TakeoutProcessorService {
 		private boolean copyFiles = true; // true = copy, false = move
 		private boolean addMetadata = true;
 		private OrganizationMode organizationMode = OrganizationMode.BY_MONTH;
+		private boolean skipDuplicates = true; // Skip duplicate files
+		private DuplicateDetector.DuplicateDetectionMode duplicateDetectionMode = DuplicateDetector.DuplicateDetectionMode.HASH;
 
 		public File getOutputDirectory() {
 			return outputDirectory;
@@ -92,6 +97,22 @@ public class TakeoutProcessorService {
 
 		public void setOrganizationMode(OrganizationMode organizationMode) {
 			this.organizationMode = organizationMode;
+		}
+
+		public boolean isSkipDuplicates() {
+			return skipDuplicates;
+		}
+
+		public void setSkipDuplicates(boolean skipDuplicates) {
+			this.skipDuplicates = skipDuplicates;
+		}
+
+		public DuplicateDetector.DuplicateDetectionMode getDuplicateDetectionMode() {
+			return duplicateDetectionMode;
+		}
+
+		public void setDuplicateDetectionMode(DuplicateDetector.DuplicateDetectionMode duplicateDetectionMode) {
+			this.duplicateDetectionMode = duplicateDetectionMode;
 		}
 
 		// Backwards compatibility helpers
@@ -132,22 +153,81 @@ public class TakeoutProcessorService {
 
 		// Handle duplicate filenames
 		destFile = ensureUniqueFilename(destFile);
+		
+		// Check for Motion Photo and extract video if present
+		if (fileWithMetadata.isImage() && motionPhotoExtractor.isMotionPhoto(mediaFile)) {
+			logger.info("Detected Motion Photo: {}", mediaFile.getName());
+			
+			// Process the photo part first
+			processPhotoFile(mediaFile, destFile, metadata, albumName, options);
+			
+			// Extract and process video part
+			try {
+				File extractedVideo = motionPhotoExtractor.extractVideo(mediaFile);
+				if (extractedVideo != null && extractedVideo.exists()) {
+					// Determine destination for video
+					File videoDestDir = destDir;
+					File videoDestFile = new File(videoDestDir, extractedVideo.getName());
+					videoDestFile = ensureUniqueFilename(videoDestFile);
+					
+					// Write metadata to video
+					if (options.isAddMetadata()) {
+						videoMetadataWriter.writeMetadata(extractedVideo, metadata, albumName);
+					}
+					
+					// Move/copy video to destination
+					if (options.isCopyFiles()) {
+						copyFile(extractedVideo, videoDestFile);
+					} else {
+						moveFile(extractedVideo, videoDestFile);
+					}
+					
+					// Clean up temp extracted video
+					if (extractedVideo.exists() && !extractedVideo.equals(videoDestFile)) {
+						extractedVideo.delete();
+					}
+					
+					logger.info("Extracted and processed Motion Photo video: {}", videoDestFile.getName());
+				}
+			} catch (Exception e) {
+				logger.warn("Failed to extract video from Motion Photo {}: {}", mediaFile.getName(), e.getMessage());
+			}
+			
+			return destFile;
+		}
 
-		// For JPEG images with metadata, write EXIF data
+		// For JPEG images with metadata, write EXIF & XMP data
 		if (options.isAddMetadata() && (metadata != null || albumName != null) && fileWithMetadata.isImage()
 				&& isJpeg(mediaFile)) {
 
 			try {
 				writeExifMetadata(mediaFile, destFile, metadata, albumName);
-				logger.debug("Added EXIF metadata to: {}", destFile.getName());
+				logger.debug("Added EXIF & XMP metadata to: {}", destFile.getName());
 			} catch (Exception e) {
 				logger.warn("Failed to write EXIF for {}: {}. Copying without metadata.", mediaFile.getName(),
 						e.getMessage());
 				// Fall back to simple copy
 				copyFile(mediaFile, destFile);
 			}
+		} else if (fileWithMetadata.isVideo()) {
+			// For videos, copy first then write XMP sidecar
+			if (options.isCopyFiles()) {
+				copyFile(mediaFile, destFile);
+			} else {
+				moveFile(mediaFile, destFile);
+			}
+			
+			// Write XMP metadata to video
+			if (options.isAddMetadata() && (metadata != null || albumName != null)) {
+				try {
+					videoMetadataWriter.writeMetadata(destFile, metadata, albumName);
+					logger.debug("Added XMP metadata to video: {}", destFile.getName());
+				} catch (Exception e) {
+					logger.warn("Failed to write metadata to video {}: {}", destFile.getName(), e.getMessage());
+				}
+			}
 		} else {
-			// For videos or files without metadata, just copy
+			// For other files, just copy/move
 			if (options.isCopyFiles()) {
 				copyFile(mediaFile, destFile);
 			} else {
@@ -156,6 +236,27 @@ public class TakeoutProcessorService {
 		}
 
 		return destFile;
+	}
+	
+	/**
+	 * Processes the photo part of a file (helper for Motion Photo processing).
+	 */
+	private void processPhotoFile(File mediaFile, File destFile, GoogleTakeoutMetadata metadata, 
+			String albumName, ProcessingOptions options) throws IOException {
+		if (options.isAddMetadata() && (metadata != null || albumName != null) && isJpeg(mediaFile)) {
+			try {
+				writeExifMetadata(mediaFile, destFile, metadata, albumName);
+			} catch (Exception e) {
+				logger.warn("Failed to write EXIF for Motion Photo {}: {}", mediaFile.getName(), e.getMessage());
+				copyFile(mediaFile, destFile);
+			}
+		} else {
+			if (options.isCopyFiles()) {
+				copyFile(mediaFile, destFile);
+			} else {
+				moveFile(mediaFile, destFile);
+			}
+		}
 	}
 
 	/**
@@ -516,6 +617,13 @@ public class TakeoutProcessorService {
 		successCount.set(0);
 		errorCount.set(0);
 		skippedCount.set(0);
+		
+		// Initialize duplicate detector if enabled
+		DuplicateDetector duplicateDetector = null;
+		if (options.isSkipDuplicates()) {
+			duplicateDetector = new DuplicateDetector(options.getDuplicateDetectionMode());
+			logger.info("Duplicate detection enabled with mode: {}", options.getDuplicateDetectionMode());
+		}
 
 		int total = files.size();
 		int current = 0;
@@ -525,6 +633,13 @@ public class TakeoutProcessorService {
 
 			if (callback != null) {
 				callback.onProgress(current, total, file.getMediaFile().getName());
+			}
+			
+			// Check for duplicates if enabled
+			if (duplicateDetector != null && duplicateDetector.isDuplicate(file.getMediaFile(), options.getOutputDirectory())) {
+				logger.debug("Skipping duplicate: {}", file.getMediaFile().getName());
+				skippedCount.incrementAndGet();
+				continue;
 			}
 
 			try {

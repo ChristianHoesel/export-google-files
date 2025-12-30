@@ -53,6 +53,7 @@ public class TakeoutProcessorApp extends Application {
     private boolean copyFiles = true;
     private TakeoutProcessorService.OrganizationMode organizationMode = TakeoutProcessorService.OrganizationMode.BY_MONTH;
     private boolean addMetadata = true;
+    private boolean skipDuplicates = true;
 
     @Override
     public void start(Stage primaryStage) {
@@ -319,6 +320,14 @@ public class TakeoutProcessorApp extends Application {
         addMetadataCheck.setTooltip(new Tooltip("Schreibt Datum, Beschreibung, Titel, Personen und Album in EXIF & XMP"));
         form.add(metadataLabel, 0, row);
         form.add(addMetadataCheck, 1, row++);
+        
+        // Duplicate detection option
+        Label duplicateLabel = new Label("Duplikate:");
+        CheckBox skipDuplicatesCheck = new CheckBox("Duplikate überspringen (Hash-Vergleich)");
+        skipDuplicatesCheck.setSelected(true);
+        skipDuplicatesCheck.setTooltip(new Tooltip("Erkennt und überspringt Duplikate basierend auf Dateiinhalt (SHA-256)"));
+        form.add(duplicateLabel, 0, row);
+        form.add(skipDuplicatesCheck, 1, row++);
 
         // Buttons
         HBox buttonBox = new HBox(15);
@@ -359,6 +368,7 @@ public class TakeoutProcessorApp extends Application {
             }
             
             addMetadata = addMetadataCheck.isSelected();
+            skipDuplicates = skipDuplicatesCheck.isSelected();
             startProcessing();
         });
 
@@ -480,6 +490,7 @@ public class TakeoutProcessorApp extends Application {
                 options.setCopyFiles(copyFiles);
                 options.setAddMetadata(addMetadata);
                 options.setOrganizationMode(organizationMode);
+                options.setSkipDuplicates(skipDuplicates);
 
                 processorService.processAllFiles(files, options, new TakeoutProcessorService.ProgressCallback() {
                     @Override

@@ -14,9 +14,10 @@ Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Verarbeiten von Go
 - **Verarbeitet Google Takeout Exporte** lokal auf Ihrem Computer
 - **Metadaten-Erhaltung und -Hinzufügung**:
   - Liest JSON-Metadaten von Google Takeout
-  - Schreibt Aufnahmedatum/-zeit in EXIF-Daten (für JPEG-Bilder)
+  - Schreibt Aufnahmedatum/-zeit in EXIF-Daten (für JPEG-Bilder und Videos)
   - Schreibt Beschreibungen, Titel und Personen in EXIF und XMP
   - Schreibt Album-Namen aus Ordnerstruktur in EXIF und XMP
+  - **Video-Metadaten**: XMP-Sidecar-Dateien für MP4/MOV Videos
   - Erhält Original-Metadaten
 - **Flexible Organisation**:
   - Nach Monat organisieren (YYYY/MM)
@@ -24,8 +25,18 @@ Ein Java-Programm mit moderner JavaFX-Benutzeroberfläche zum Verarbeiten von Go
   - Flach in einem Verzeichnis (keine Unterordner)
 - **EXIF & XMP Metadaten**:
   - Dual-Format für maximale Kompatibilität
-  - EXIF für Datum, Beschreibung, Titel
+  - EXIF für Datum, Beschreibung, Titel (JPEG)
   - XMP für Personen (dc:subject) und Album (lr:hierarchicalSubject)
+  - XMP-Sidecar-Dateien für Videos
+- **Duplikaterkennung**:
+  - Content-basierte Erkennung mittels SHA-256 Hash
+  - Verhindert doppelte Dateien im Ausgabeverzeichnis
+  - Drei Modi: Hash, Name+Größe, Nur Name
+- **Motion Photos / Live Photos**:
+  - Automatische Erkennung von Google Motion Photos
+  - Extrahiert Video-Komponente aus eingebetteten Motion Photos
+  - Speichert Foto und Video als separate Dateien mit Metadaten
+  - Unterstützt Pixel-Phones und kompatible Geräte
 - **Fortschrittsanzeige** während der Verarbeitung
 - **Vorschau-Funktion** um zu sehen, was verarbeitet wird
 
@@ -51,12 +62,15 @@ Die Anwendung bietet eine moderne, benutzerfreundliche Oberfläche:
    - Wählen Sie ein Ausgabeverzeichnis
    - Wählen Sie Organisation: Nach Monat, Nach Album oder Flach
    - Wählen Sie ob EXIF & XMP Metadaten geschrieben werden sollen
+   - Optional: Aktivieren Sie Duplikaterkennung
    - Klicken Sie auf "Verarbeiten"
 
 3. **Ergebnis**:
    - Dateien werden organisiert (je nach gewählter Option)
    - JPEG-Bilder erhalten EXIF & XMP Metadaten
-   - Videos werden organisiert (Metadaten bleiben in JSON)
+   - Videos erhalten XMP-Sidecar-Dateien (.xmp)
+   - Motion Photos werden in Foto + Video aufgeteilt
+   - Duplikate werden automatisch übersprungen (falls aktiviert)
 
 ## Download & Verwendung
 
@@ -292,6 +306,7 @@ mvn package
 - **Java 21** - Java LTS Version
 - **JavaFX 21** - Moderne Desktop-GUI
 - **Apache Commons Imaging** - EXIF & XMP Metadaten schreiben
+- **Apache Commons Codec** - SHA-256 Hashing für Duplikaterkennung
 - **Adobe XMP Core** - XMP-Packet-Generierung
 - **Gson** - JSON-Parsing
 - **Maven** - Build-Management
@@ -306,12 +321,15 @@ Diese Version wurde komplett umgebaut, um **lokal mit Google Takeout Exporten zu
 - ✅ Vollständig offline nach dem Download
 - ✅ Schnellere Verarbeitung (keine API-Rate-Limits)
 - ✅ Volle Kontrolle über Ihre Daten
+- ✅ **Neu: Duplikaterkennung** mit Hash-Vergleich
+- ✅ **Neu: Video-Metadaten** via XMP-Sidecar-Dateien
+- ✅ **Neu: Motion Photos Unterstützung** - extrahiert Videos aus Live Photos
 
 ## Bekannte Einschränkungen
 
 - GPS-Koordinaten werden aktuell nicht in EXIF geschrieben (Limitierung der Apache Commons Imaging Alpha-Version)
-- EXIF und XMP Metadaten können nur für JPEG-Bilder geschrieben werden
-- Videos erhalten keine EXIF/XMP-Metadaten, behalten aber ihre JSON-Dateien
+- EXIF Metadaten können nur für JPEG-Bilder geschrieben werden
+- Videos erhalten XMP-Sidecar-Dateien (.xmp) anstatt eingebettete Metadaten
 
 ## Lizenz
 
