@@ -3,6 +3,7 @@ package de.christianhoesel.googlephotos.service;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,6 +33,7 @@ import com.adobe.internal.xmp.XMPMetaFactory;
 import com.adobe.internal.xmp.options.SerializeOptions;
 
 import de.christianhoesel.googlephotos.model.GoogleTakeoutMetadata;
+import de.christianhoesel.googlephotos.model.GoogleTakeoutMetadata.Person;
 
 /**
  * Service to process Google Takeout files, add metadata, and organize into
@@ -43,7 +45,7 @@ public class TakeoutProcessorService {
 	private final AtomicInteger successCount = new AtomicInteger(0);
 	private final AtomicInteger errorCount = new AtomicInteger(0);
 	private final AtomicInteger skippedCount = new AtomicInteger(0);
-	
+
 	private final MotionPhotoExtractor motionPhotoExtractor = new MotionPhotoExtractor();
 	private final VideoMetadataWriter videoMetadataWriter = new VideoMetadataWriter();
 
@@ -131,7 +133,7 @@ public class TakeoutProcessorService {
 
 	/**
 	 * Processes a single media file with metadata.
-	 * 
+	 *
 	 * @param fileWithMetadata The media file with its metadata
 	 * @param options          Processing options
 	 * @return The destination file
@@ -153,14 +155,14 @@ public class TakeoutProcessorService {
 
 		// Handle duplicate filenames
 		destFile = ensureUniqueFilename(destFile);
-		
+
 		// Check for Motion Photo and extract video if present
 		if (fileWithMetadata.isImage() && motionPhotoExtractor.isMotionPhoto(mediaFile)) {
 			logger.info("Detected Motion Photo: {}", mediaFile.getName());
-			
+
 			// Process the photo part first
 			processPhotoFile(mediaFile, destFile, metadata, albumName, options);
-			
+
 			// Extract and process video part
 			try {
 				File extractedVideo = motionPhotoExtractor.extractVideo(mediaFile);
@@ -169,30 +171,30 @@ public class TakeoutProcessorService {
 					File videoDestDir = destDir;
 					File videoDestFile = new File(videoDestDir, extractedVideo.getName());
 					videoDestFile = ensureUniqueFilename(videoDestFile);
-					
+
 					// Move/copy video to destination first
 					if (options.isCopyFiles()) {
 						copyFile(extractedVideo, videoDestFile);
 					} else {
 						moveFile(extractedVideo, videoDestFile);
 					}
-					
+
 					// Write metadata to final video file
 					if (options.isAddMetadata()) {
 						videoMetadataWriter.writeMetadata(videoDestFile, metadata, albumName);
 					}
-					
+
 					// Clean up temp extracted video if it's different from destination
 					if (extractedVideo.exists() && !extractedVideo.equals(videoDestFile)) {
 						extractedVideo.delete();
 					}
-					
+
 					logger.info("Extracted and processed Motion Photo video: {}", videoDestFile.getName());
 				}
 			} catch (Exception e) {
 				logger.warn("Failed to extract video from Motion Photo {}: {}", mediaFile.getName(), e.getMessage());
 			}
-			
+
 			return destFile;
 		}
 
@@ -216,7 +218,7 @@ public class TakeoutProcessorService {
 			} else {
 				moveFile(mediaFile, destFile);
 			}
-			
+
 			// Write XMP metadata to video
 			if (options.isAddMetadata() && (metadata != null || albumName != null)) {
 				try {
@@ -237,12 +239,12 @@ public class TakeoutProcessorService {
 
 		return destFile;
 	}
-	
+
 	/**
 	 * Processes the photo part of a file (helper for Motion Photo processing).
 	 */
-	private void processPhotoFile(File mediaFile, File destFile, GoogleTakeoutMetadata metadata, 
-			String albumName, ProcessingOptions options) throws IOException {
+	private void processPhotoFile(File mediaFile, File destFile, GoogleTakeoutMetadata metadata, String albumName,
+			ProcessingOptions options) throws IOException {
 		if (options.isAddMetadata() && (metadata != null || albumName != null) && isJpeg(mediaFile)) {
 			try {
 				writeExifMetadata(mediaFile, destFile, metadata, albumName);
@@ -271,13 +273,11 @@ public class TakeoutProcessorService {
 			// Organize by album with year-month prefix
 			LocalDateTime albumDateTime = extractDateTime(metadata);
 			String folderName;
-			
+
 			if (albumName != null && !albumName.trim().isEmpty()) {
 				if (albumDateTime != null) {
 					// Prefix with YYYY-MM
-					String yearMonth = String.format("%d-%02d", 
-						albumDateTime.getYear(), 
-						albumDateTime.getMonthValue());
+					String yearMonth = String.format("%d-%02d", albumDateTime.getYear(), albumDateTime.getMonthValue());
 					folderName = yearMonth + " " + albumName;
 				} else {
 					// No date available, use album name without prefix
@@ -287,9 +287,7 @@ public class TakeoutProcessorService {
 			} else {
 				// No album, put in "No_Album" folder (optionally with date prefix)
 				if (albumDateTime != null) {
-					String yearMonth = String.format("%d-%02d", 
-						albumDateTime.getYear(), 
-						albumDateTime.getMonthValue());
+					String yearMonth = String.format("%d-%02d", albumDateTime.getYear(), albumDateTime.getMonthValue());
 					folderName = yearMonth + " No_Album";
 				} else {
 					folderName = "No_Album";
@@ -347,9 +345,12 @@ public class TakeoutProcessorService {
 
 	/**
 	 * Writes EXIF metadata to a JPEG file.
+	 *
+	 * @throws IOException
+	 * @throws FileNotFoundException
 	 */
 	private void writeExifMetadata(File sourceFile, File destFile, GoogleTakeoutMetadata metadata, String albumName)
-			throws Exception {
+			throws FileNotFoundException, IOException {
 
 		// Read existing metadata
 		TiffOutputSet outputSet = null;
@@ -407,8 +408,9 @@ public class TakeoutProcessorService {
 		if (metadata.getPeople() != null && !metadata.getPeople().isEmpty()) {
 			StringBuilder peopleStr = new StringBuilder();
 			for (int i = 0; i < metadata.getPeople().size(); i++) {
-				if (i > 0)
+				if (i > 0) {
 					peopleStr.append(", ");
+				}
 				peopleStr.append(metadata.getPeople().get(i).getName());
 			}
 
@@ -478,9 +480,12 @@ public class TakeoutProcessorService {
 	/**
 	 * Writes XMP metadata to a JPEG file using JpegXmpRewriter. XMP is a modern
 	 * standard for storing extended metadata that doesn't fit well in EXIF.
+	 *
+	 * @throws XMPException
+	 * @throws IOException
 	 */
 	private void writeXmpMetadata(File sourceFile, File destFile, GoogleTakeoutMetadata metadata, String albumName)
-			throws Exception {
+			throws XMPException, IOException {
 
 		// Create XMP metadata
 		XMPMeta xmpMeta = XMPMetaFactory.create();
@@ -504,8 +509,7 @@ public class TakeoutProcessorService {
 			com.adobe.internal.xmp.options.PropertyOptions arrayOptions = new com.adobe.internal.xmp.options.PropertyOptions();
 			arrayOptions.setArray(true);
 
-			for (int i = 0; i < metadata.getPeople().size(); i++) {
-				GoogleTakeoutMetadata.Person person = metadata.getPeople().get(i);
+			for (Person person : metadata.getPeople()) {
 				if (person.getName() != null && !person.getName().trim().isEmpty()) {
 					xmpMeta.appendArrayItem(dcNS, "subject", arrayOptions, person.getName(), null);
 					logger.debug("Added person '{}' to XMP keywords", person.getName());
@@ -617,7 +621,7 @@ public class TakeoutProcessorService {
 		successCount.set(0);
 		errorCount.set(0);
 		skippedCount.set(0);
-		
+
 		// Initialize duplicate detector if enabled
 		DuplicateDetector duplicateDetector = null;
 		if (options.isSkipDuplicates()) {
@@ -634,9 +638,10 @@ public class TakeoutProcessorService {
 			if (callback != null) {
 				callback.onProgress(current, total, file.getMediaFile().getName());
 			}
-			
+
 			// Check for duplicates if enabled
-			if (duplicateDetector != null && duplicateDetector.isDuplicate(file.getMediaFile(), options.getOutputDirectory())) {
+			if (duplicateDetector != null
+					&& duplicateDetector.isDuplicate(file.getMediaFile(), options.getOutputDirectory())) {
 				logger.debug("Skipping duplicate: {}", file.getMediaFile().getName());
 				skippedCount.incrementAndGet();
 				continue;

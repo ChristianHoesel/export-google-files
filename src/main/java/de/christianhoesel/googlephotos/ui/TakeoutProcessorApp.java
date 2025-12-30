@@ -1,5 +1,13 @@
 package de.christianhoesel.googlephotos.ui;
 
+import java.io.File;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import de.christianhoesel.googlephotos.service.GoogleTakeoutService;
 import de.christianhoesel.googlephotos.service.TakeoutProcessorService;
 import javafx.application.Application;
@@ -8,19 +16,28 @@ import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * JavaFX Application for Google Takeout Processor.
@@ -72,7 +89,7 @@ public class TakeoutProcessorApp extends Application {
         createMainLayout();
 
         Scene scene = new Scene(mainLayout, 1000, 700);
-        
+
         // Load CSS if available
         try {
             var cssResource = getClass().getResource("/styles/app.css");
@@ -82,7 +99,7 @@ public class TakeoutProcessorApp extends Application {
         } catch (Exception e) {
             logger.warn("Could not load CSS stylesheet: {}", e.getMessage());
         }
-        
+
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -295,20 +312,20 @@ public class TakeoutProcessorApp extends Application {
         // Organization options with radio buttons
         Label organizeLabel = new Label("Organisation:");
         ToggleGroup organizationGroup = new ToggleGroup();
-        
+
         RadioButton organizeByMonthRadio = new RadioButton("Nach Monat (YYYY/MM)");
         organizeByMonthRadio.setToggleGroup(organizationGroup);
         organizeByMonthRadio.setSelected(true);
         organizeByMonthRadio.setTooltip(new Tooltip("Dateien nach Aufnahmedatum in Jahr/Monat Ordner sortieren"));
-        
+
         RadioButton organizeByAlbumRadio = new RadioButton("Nach Album");
         organizeByAlbumRadio.setToggleGroup(organizationGroup);
         organizeByAlbumRadio.setTooltip(new Tooltip("Dateien nach Album-Namen aus Ordnerstruktur sortieren"));
-        
+
         RadioButton organizeFlatRadio = new RadioButton("Flach (keine Unterordner)");
         organizeFlatRadio.setToggleGroup(organizationGroup);
         organizeFlatRadio.setTooltip(new Tooltip("Alle Dateien direkt im Ausgabeverzeichnis"));
-        
+
         VBox organizationBox = new VBox(5, organizeByMonthRadio, organizeByAlbumRadio, organizeFlatRadio);
         form.add(organizeLabel, 0, row);
         form.add(organizationBox, 1, row++);
@@ -320,7 +337,7 @@ public class TakeoutProcessorApp extends Application {
         addMetadataCheck.setTooltip(new Tooltip("Schreibt Datum, Beschreibung, Titel, Personen und Album in EXIF & XMP"));
         form.add(metadataLabel, 0, row);
         form.add(addMetadataCheck, 1, row++);
-        
+
         // Duplicate detection option
         Label duplicateLabel = new Label("Duplikate:");
         CheckBox skipDuplicatesCheck = new CheckBox("Duplikate überspringen (Hash-Vergleich)");
@@ -357,7 +374,7 @@ public class TakeoutProcessorApp extends Application {
             }
             outputDirectory = new File(outputField.getText());
             copyFiles = copyCheck.isSelected();
-            
+
             // Determine organization mode from radio buttons
             if (organizeByMonthRadio.isSelected()) {
                 organizationMode = TakeoutProcessorService.OrganizationMode.BY_MONTH;
@@ -366,7 +383,7 @@ public class TakeoutProcessorApp extends Application {
             } else {
                 organizationMode = TakeoutProcessorService.OrganizationMode.FLAT;
             }
-            
+
             addMetadata = addMetadataCheck.isSelected();
             skipDuplicates = skipDuplicatesCheck.isSelected();
             startProcessing();
@@ -388,7 +405,7 @@ public class TakeoutProcessorApp extends Application {
             @Override
             protected GoogleTakeoutService.ScanStatistics call() throws Exception {
                 GoogleTakeoutService service = new GoogleTakeoutService();
-                List<GoogleTakeoutService.MediaFileWithMetadata> files = 
+                List<GoogleTakeoutService.MediaFileWithMetadata> files =
                     service.scanTakeoutDirectory(takeoutDirectory);
                 return service.calculateStatistics(files);
             }
@@ -471,9 +488,9 @@ public class TakeoutProcessorApp extends Application {
             @Override
             protected Void call() throws Exception {
                 updateMessage("Scanne Dateien...");
-                
+
                 GoogleTakeoutService takeoutService = new GoogleTakeoutService();
-                List<GoogleTakeoutService.MediaFileWithMetadata> files = 
+                List<GoogleTakeoutService.MediaFileWithMetadata> files =
                     takeoutService.scanTakeoutDirectory(takeoutDirectory);
 
                 if (files.isEmpty()) {
@@ -482,9 +499,9 @@ public class TakeoutProcessorApp extends Application {
                 }
 
                 updateMessage("Starte Verarbeitung von " + files.size() + " Dateien...");
-                
+
                 TakeoutProcessorService processorService = new TakeoutProcessorService();
-                TakeoutProcessorService.ProcessingOptions options = 
+                TakeoutProcessorService.ProcessingOptions options =
                     new TakeoutProcessorService.ProcessingOptions();
                 options.setOutputDirectory(outputDirectory);
                 options.setCopyFiles(copyFiles);
@@ -495,12 +512,14 @@ public class TakeoutProcessorApp extends Application {
                 processorService.processAllFiles(files, options, new TakeoutProcessorService.ProgressCallback() {
                     @Override
                     public void onProgress(int current, int total, String currentFile) {
-                        if (isCancelled()) return;
-                        
+                        if (isCancelled()) {
+							return;
+						}
+
                         Platform.runLater(() -> {
                             procProgressBar.setProgress((double) current / total);
                             progressLabel.setText("Verarbeite: " + currentFile);
-                            statsLabel.setText(String.format("%d / %d (%.0f%%)", 
+                            statsLabel.setText(String.format("%d / %d (%.0f%%)",
                                 current, total, (double) current / total * 100));
                         });
                     }
@@ -573,13 +592,13 @@ public class TakeoutProcessorApp extends Application {
         helpText.setPrefHeight(400);
         helpText.setText("""
             GOOGLE TAKEOUT PROCESSOR - HILFE
-            
+
             1. GOOGLE TAKEOUT EXPORT ERSTELLEN
                - Gehe zu https://takeout.google.com
                - Wähle "Google Photos" aus
                - Erstelle den Export und lade ihn herunter
                - Entpacke die ZIP-Datei
-            
+
             2. VERARBEITUNG STARTEN
                - Klicke auf "Verarbeiten" im Menü
                - Wähle das entpackte Takeout-Verzeichnis
@@ -590,7 +609,7 @@ public class TakeoutProcessorApp extends Application {
                  * EXIF & XMP-Metadaten hinzufügen
                - Klicke auf "Vorschau" um zu sehen, was gefunden wurde
                - Klicke auf "Verarbeiten" um zu starten
-            
+
             3. WAS PASSIERT?
                Die App:
                - Scannt alle Bilder und Videos im Takeout-Ordner
@@ -598,10 +617,10 @@ public class TakeoutProcessorApp extends Application {
                - Schreibt optional Metadaten in EXIF & XMP (für JPEGs)
                - Organisiert Dateien nach gewählter Option
                - Kopiert oder verschiebt die Dateien
-            
+
             4. METADATEN
                Folgende Metadaten werden verarbeitet (wenn aktiviert):
-               
+
                EXIF-Felder:
                - Aufnahmedatum/-zeit (EXIF DateTimeOriginal)
                - Erstellungsdatum/-zeit (EXIF DateTimeDigitized)
@@ -609,17 +628,17 @@ public class TakeoutProcessorApp extends Application {
                - Titel (EXIF DocumentName)
                - Personen (EXIF Software als "People: Name1, Name2")
                - Album (EXIF Artist als "Album: AlbumName")
-               
+
                XMP-Felder:
                - Personen (XMP dc:subject Keywords)
                - Album (XMP lr:hierarchicalSubject)
                - Titel (XMP dc:title)
                - Beschreibung (XMP dc:description)
-               
+
                Hinweis: Album-Namen werden aus der Ordnerstruktur des
                Takeout-Exports extrahiert. XMP ist ein moderner Standard
                für erweiterte Metadaten.
-            
+
             5. ORDNERSTRUKTUR
                Nach Monat (YYYY/MM):
                <Ausgabeverzeichnis>/
@@ -629,22 +648,22 @@ public class TakeoutProcessorApp extends Application {
                  2022/
                    12/  (Dezember 2022)
                  Unknown_Date/  (Dateien ohne Datum)
-               
+
                Nach Album (mit Datum-Präfix):
                <Ausgabeverzeichnis>/
                  2023-07 Sommerurlaub/
                  2023-12 Familienfotos/
                  2024-03 Geburtstag 2023/
                  No_Album/  (Dateien ohne Album und Datum)
-               
+
                Hinweis: Bei "Nach Album" wird das Aufnahmedatum (YYYY-MM)
                vor den Albumnamen gesetzt, um eine chronologische Sortierung
                zu ermöglichen.
-               
+
                Flach (keine Unterordner):
                <Ausgabeverzeichnis>/
                  [Alle Dateien direkt im Hauptordner]
-            
+
             HINWEISE:
             - JPEG-Bilder erhalten EXIF & XMP-Metadaten
             - Videos werden organisiert, aber Metadaten nicht geändert
@@ -691,12 +710,12 @@ public class TakeoutProcessorApp extends Application {
     @Override
     public void stop() {
         logger.info("Shutting down application...");
-        
+
         if (currentTask != null && currentTask.isRunning()) {
             logger.info("Cancelling running task before shutdown");
             currentTask.cancel();
         }
-        
+
         if (executorService != null) {
             logger.info("Shutting down executor service");
             executorService.shutdownNow();
@@ -709,7 +728,7 @@ public class TakeoutProcessorApp extends Application {
                 Thread.currentThread().interrupt();
             }
         }
-        
+
         logger.info("Application shutdown complete");
     }
 

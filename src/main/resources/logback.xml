@@ -31,7 +31,4 @@
     <!-- Application specific logging -->
     <logger name="de.christianhoesel.googlephotos" level="DEBUG" />
     
-    <!-- Reduce verbosity of Google API libraries -->
-    <logger name="com.google" level="WARN" />
-    <logger name="io.grpc" level="WARN" />
 </configuration>
