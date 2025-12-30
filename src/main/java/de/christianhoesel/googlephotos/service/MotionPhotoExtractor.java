@@ -93,8 +93,16 @@ public class MotionPhotoExtractor {
     private boolean hasMotionPhotoXmp(File file) {
         try {
             // Read file and look for GCamera namespace in XMP
-            byte[] fileBytes = Files.readAllBytes(file.toPath());
-            String content = new String(fileBytes, "UTF-8");
+            // Only load first 64KB to avoid memory issues with large files
+            long fileSize = file.length();
+            int bytesToRead = (int) Math.min(fileSize, 65536);
+            byte[] header = new byte[bytesToRead];
+            
+            try (FileInputStream fis = new FileInputStream(file)) {
+                fis.read(header);
+            }
+            
+            String content = new String(header, java.nio.charset.StandardCharsets.UTF_8);
             
             // Look for GCamera:MicroVideo or GCamera:MotionPhoto markers
             return content.contains("GCamera:MicroVideo") || 

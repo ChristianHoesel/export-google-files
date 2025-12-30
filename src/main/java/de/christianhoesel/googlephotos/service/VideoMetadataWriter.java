@@ -130,7 +130,7 @@ public class VideoMetadataWriter {
             
             // Write to file
             try (FileOutputStream fos = new FileOutputStream(xmpFile)) {
-                fos.write(xmpString.getBytes("UTF-8"));
+                fos.write(xmpString.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             }
             
             logger.debug("Wrote XMP sidecar file: {}", xmpFile.getName());

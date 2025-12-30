@@ -170,19 +170,19 @@ public class TakeoutProcessorService {
 					File videoDestFile = new File(videoDestDir, extractedVideo.getName());
 					videoDestFile = ensureUniqueFilename(videoDestFile);
 					
-					// Write metadata to video
-					if (options.isAddMetadata()) {
-						videoMetadataWriter.writeMetadata(extractedVideo, metadata, albumName);
-					}
-					
-					// Move/copy video to destination
+					// Move/copy video to destination first
 					if (options.isCopyFiles()) {
 						copyFile(extractedVideo, videoDestFile);
 					} else {
 						moveFile(extractedVideo, videoDestFile);
 					}
 					
-					// Clean up temp extracted video
+					// Write metadata to final video file
+					if (options.isAddMetadata()) {
+						videoMetadataWriter.writeMetadata(videoDestFile, metadata, albumName);
+					}
+					
+					// Clean up temp extracted video if it's different from destination
 					if (extractedVideo.exists() && !extractedVideo.equals(videoDestFile)) {
 						extractedVideo.delete();
 					}
