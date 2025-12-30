@@ -619,12 +619,16 @@ public class TakeoutProcessorApp extends Application {
                    12/  (Dezember 2022)
                  Unknown_Date/  (Dateien ohne Datum)
                
-               Nach Album:
+               Nach Album (mit Datum-Präfix):
                <Ausgabeverzeichnis>/
-                 Sommerurlaub/
-                 Familienfotos/
-                 Geburtstag 2023/
-                 No_Album/  (Dateien ohne Album)
+                 2023-07 Sommerurlaub/
+                 2023-12 Familienfotos/
+                 2024-03 Geburtstag 2023/
+                 No_Album/  (Dateien ohne Album und Datum)
+               
+               Hinweis: Bei "Nach Album" wird das Aufnahmedatum (YYYY-MM)
+               vor den Albumnamen gesetzt, um eine chronologische Sortierung
+               zu ermöglichen.
                
                Flach (keine Unterordner):
                <Ausgabeverzeichnis>/

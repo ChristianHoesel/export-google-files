@@ -309,9 +309,12 @@ class TakeoutProcessorServiceTest {
 
         File resultFile = service.processMediaFile(fileWithMetadata, options);
 
-        // Check that file is in album folder
-        assertEquals("Summer 2023", resultFile.getParentFile().getName(), 
-            "File should be in album folder");
+        // Check that file is in album folder with date prefix (YYYY-MM AlbumName)
+        String folderName = resultFile.getParentFile().getName();
+        assertTrue(folderName.startsWith("2021-01"), 
+            "Folder should start with YYYY-MM date prefix");
+        assertTrue(folderName.contains("Summer 2023"), 
+            "Folder should contain album name");
         assertTrue(resultFile.exists(), "File should be copied");
     }
     

@@ -167,12 +167,33 @@ public class TakeoutProcessorService {
 
 		switch (options.getOrganizationMode()) {
 		case BY_ALBUM:
-			// Organize by album
+			// Organize by album with year-month prefix
+			LocalDateTime albumDateTime = extractDateTime(metadata);
+			String folderName;
+			
 			if (albumName != null && !albumName.trim().isEmpty()) {
-				return new File(baseDir, albumName);
+				if (albumDateTime != null) {
+					// Prefix with YYYY-MM
+					String yearMonth = String.format("%d-%02d", 
+						albumDateTime.getYear(), 
+						albumDateTime.getMonthValue());
+					folderName = yearMonth + " " + albumName;
+				} else {
+					// No date available, use album name without prefix
+					folderName = albumName;
+				}
+				return new File(baseDir, folderName);
 			} else {
-				// No album, put in "No_Album" folder
-				return new File(baseDir, "No_Album");
+				// No album, put in "No_Album" folder (optionally with date prefix)
+				if (albumDateTime != null) {
+					String yearMonth = String.format("%d-%02d", 
+						albumDateTime.getYear(), 
+						albumDateTime.getMonthValue());
+					folderName = yearMonth + " No_Album";
+				} else {
+					folderName = "No_Album";
+				}
+				return new File(baseDir, folderName);
 			}
 
 		case BY_MONTH:
