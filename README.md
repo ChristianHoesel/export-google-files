@@ -334,7 +334,3 @@ Diese Version wurde komplett umgebaut, um **lokal mit Google Takeout Exporten zu
 ## Lizenz
 
 Apache License 2.0 - siehe [LICENSE](LICENSE) Datei
-
-## Beitragen
-
-Pull Requests sind willkommen! Für größere Änderungen bitte zuerst ein Issue erstellen.
