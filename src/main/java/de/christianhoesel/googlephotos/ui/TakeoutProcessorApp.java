@@ -160,7 +160,7 @@ public class TakeoutProcessorApp extends Application {
         menuTitle.getStyleClass().add("menu-title");
         menuTitle.setPadding(new Insets(0, 0, 10, 10));
 
-        Button btnProcess = createMenuButton("⚙️ Verarbeiten", this::showProcessView);
+        Button btnProcess = createMenuButton("⚙ Verarbeiten", this::showProcessView);
         Button btnHelp = createMenuButton("❓ Hilfe", this::showHelpView);
 
         panel.getChildren().addAll(menuTitle, btnProcess, btnHelp);
@@ -237,7 +237,7 @@ public class TakeoutProcessorApp extends Application {
             featureBox.getChildren().add(featureLabel);
         }
 
-        Button startButton = new Button("⚙️ Verarbeitung starten");
+        Button startButton = new Button("⚙ Verarbeitung starten");
         startButton.getStyleClass().add(PRIMARY_BUTTON);
         startButton.setFont(Font.font(SYSTEM, FontWeight.BOLD, 16));
         startButton.setOnAction(e -> showProcessView());
@@ -251,7 +251,7 @@ public class TakeoutProcessorApp extends Application {
         processView.getStyleClass().add("export-view");
         processView.setPadding(new Insets(10));
 
-        Label title = new Label("⚙️ Google Takeout verarbeiten");
+        Label title = new Label("⚙ Google Takeout verarbeiten");
         title.getStyleClass().add("view-title");
         title.setFont(Font.font(SYSTEM, FontWeight.BOLD, 24));
 
@@ -361,7 +361,7 @@ public class TakeoutProcessorApp extends Application {
             scanTakeout();
         });
 
-        Button processButton = new Button("▶️ Verarbeiten");
+        Button processButton = new Button("▶ Verarbeiten");
         processButton.getStyleClass().add(PRIMARY_BUTTON);
         processButton.setOnAction(e -> {
             if (takeoutDirectory == null) {
