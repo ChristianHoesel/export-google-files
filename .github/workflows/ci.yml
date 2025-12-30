@@ -66,11 +66,11 @@ jobs:
           --app-version ${{ env.APP_VERSION }} `
           --vendor "Christian Hoesel" `
           --description "Export photos and videos from Google Photos" `
-          --dest target/app `
+          --dest dist `
           --win-console
 
     - name: Create ZIP archive
-      run: Compress-Archive -Path "target/app/${{ env.APP_NAME }}" -DestinationPath "target/${{ env.APP_NAME }}-windows.zip"
+      run: Compress-Archive -Path "dist/${{ env.APP_NAME }}" -DestinationPath "target/${{ env.APP_NAME }}-windows.zip"
 
     - name: Upload Windows executable
       continue-on-error: true
@@ -111,10 +111,10 @@ jobs:
           --app-version ${{ env.APP_VERSION }} \
           --vendor "Christian Hoesel" \
           --description "Export photos and videos from Google Photos" \
-          --dest target/app
+          --dest dist
 
     - name: Create ZIP archive
-      run: cd target/app && zip -r "../${{ env.APP_NAME }}-macos.zip" "${{ env.APP_NAME }}.app"
+      run: cd dist && zip -r "../target/${{ env.APP_NAME }}-macos.zip" "${{ env.APP_NAME }}.app"
 
     - name: Upload macOS executable
       continue-on-error: true
@@ -155,10 +155,10 @@ jobs:
           --app-version ${{ env.APP_VERSION }} \
           --vendor "Christian Hoesel" \
           --description "Export photos and videos from Google Photos" \
-          --dest target/app
+          --dest dist
 
     - name: Create ZIP archive
-      run: cd target/app && zip -r "../${{ env.APP_NAME }}-linux.zip" "${{ env.APP_NAME }}"
+      run: cd dist && zip -r "../target/${{ env.APP_NAME }}-linux.zip" "${{ env.APP_NAME }}"
 
     - name: Upload Linux executable
       continue-on-error: true
