@@ -16,50 +16,12 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <google.api.version>2.2.0</google.api.version>
-        <google.oauth.version>1.34.1</google.oauth.version>
-        <google.http.version>1.43.3</google.http.version>
         <junit.version>5.10.0</junit.version>
         <javafx.version>21.0.1</javafx.version>
     </properties>
 
     <dependencies>
-        <!-- Google API Client -->
-        <dependency>
-            <groupId>com.google.api-client</groupId>
-            <artifactId>google-api-client</artifactId>
-            <version>${google.api.version}</version>
-        </dependency>
-
-        <!-- Google OAuth Client -->
-        <dependency>
-            <groupId>com.google.oauth-client</groupId>
-            <artifactId>google-oauth-client-jetty</artifactId>
-            <version>${google.oauth.version}</version>
-        </dependency>
-
-        <!-- Google HTTP Client -->
-        <dependency>
-            <groupId>com.google.http-client</groupId>
-            <artifactId>google-http-client-gson</artifactId>
-            <version>${google.http.version}</version>
-        </dependency>
-
-        <!-- Google Photos Library API -->
-        <dependency>
-            <groupId>com.google.photos.library</groupId>
-            <artifactId>google-photos-library-client</artifactId>
-            <version>1.7.3</version>
-        </dependency>
-        
-        <!-- Explicit gRPC auth for better credential handling -->
-        <dependency>
-            <groupId>com.google.auth</groupId>
-            <artifactId>google-auth-library-oauth2-http</artifactId>
-            <version>1.23.0</version>
-        </dependency>
-
-        <!-- Metadata Extractor for EXIF -->
+        <!-- Metadata Extractor for EXIF reading -->
         <dependency>
             <groupId>com.drewnoakes</groupId>
             <artifactId>metadata-extractor</artifactId>
@@ -71,6 +33,20 @@
             <groupId>com.adobe.xmp</groupId>
             <artifactId>xmpcore</artifactId>
             <version>6.1.11</version>
+        </dependency>
+
+        <!-- Apache Commons Imaging for writing EXIF -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-imaging</artifactId>
+            <version>1.0.0-alpha5</version>
+        </dependency>
+
+        <!-- Apache Commons Codec for hashing -->
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.16.0</version>
         </dependency>
 
         <!-- Gson for JSON -->
@@ -130,6 +106,17 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -141,7 +128,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>de.christianhoesel.googlephotos.ui.GooglePhotosApp</mainClass>
+                    <mainClass>de.christianhoesel.googlephotos.ui.TakeoutProcessorApp</mainClass>
                 </configuration>
             </plugin>
             <plugin>
