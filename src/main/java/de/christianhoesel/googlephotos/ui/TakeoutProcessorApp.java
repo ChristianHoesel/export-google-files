@@ -463,7 +463,7 @@ public class TakeoutProcessorApp extends Application {
         progressView.setPadding(new Insets(40));
         progressView.getStyleClass().add("progress-view");
 
-        Label title = new Label("⚙️ Verarbeitung läuft...");
+        Label title = new Label("⚙ Verarbeitung läuft...");
         title.getStyleClass().add("view-title");
         title.setFont(Font.font(SYSTEM, FontWeight.BOLD, 24));
 
