@@ -68,7 +68,7 @@ public class TakeoutProcessorApp extends Application {
     private File takeoutDirectory;
     private File outputDirectory;
     private boolean copyFiles = true;
-    private TakeoutProcessorService.OrganizationMode organizationMode = TakeoutProcessorService.OrganizationMode.BY_MONTH;
+    private TakeoutProcessorService.OrganizationMode organizationMode = TakeoutProcessorService.OrganizationMode.BY_ALBUM;
     private boolean addMetadata = true;
     private boolean skipDuplicates = true;
 
@@ -315,12 +315,12 @@ public class TakeoutProcessorApp extends Application {
 
         RadioButton organizeByMonthRadio = new RadioButton("Nach Monat (YYYY/MM)");
         organizeByMonthRadio.setToggleGroup(organizationGroup);
-        organizeByMonthRadio.setSelected(true);
         organizeByMonthRadio.setTooltip(new Tooltip("Dateien nach Aufnahmedatum in Jahr/Monat Ordner sortieren"));
 
         RadioButton organizeByAlbumRadio = new RadioButton("Nach Album");
         organizeByAlbumRadio.setToggleGroup(organizationGroup);
-        organizeByAlbumRadio.setTooltip(new Tooltip("Dateien in Jahr/Monat/Album Hierarchie sortieren"));
+        organizeByAlbumRadio.setSelected(true);
+        organizeByAlbumRadio.setTooltip(new Tooltip("Dateien in Jahr/Album Hierarchie sortieren"));
 
         RadioButton organizeFlatRadio = new RadioButton("Flach (keine Unterordner)");
         organizeFlatRadio.setToggleGroup(organizationGroup);
@@ -649,21 +649,19 @@ public class TakeoutProcessorApp extends Application {
                    12/  (Dezember 2022)
                  Unknown_Date/  (Dateien ohne Datum)
 
-               Nach Album (Jahr/Monat/Album):
+               Nach Album (Jahr/Album):
                <Ausgabeverzeichnis>/
                  2023/
-                   07/
-                     Sommerurlaub/
-                     Familienfotos/
-                   12/
-                     Geburtstag 2023/
-                     No_Album/  (Dateien ohne Album)
+                   Sommerurlaub/
+                   Familienfotos/
+                   Geburtstag 2023/
+                   No_Album/  (Dateien ohne Album)
                  Unknown_Date/  (Dateien ohne Datum)
                    MeinAlbum/
                    No_Album/
 
                Hinweis: Bei "Nach Album" wird eine hierarchische Struktur
-               Jahr/Monat/Album erstellt. Dateien ohne Datum werden in
+               Jahr/Album erstellt. Dateien ohne Datum werden in
                "Unknown_Date" organisiert.
 
                Flach (keine Unterordner):

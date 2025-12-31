@@ -309,18 +309,15 @@ class TakeoutProcessorServiceTest {
 
         File resultFile = service.processMediaFile(fileWithMetadata, options);
 
-        // Check that file is in hierarchical folder structure (YYYY/MM/AlbumName)
+        // Check that file is in hierarchical folder structure (YYYY/AlbumName)
         assertTrue(resultFile.exists(), "File should be copied");
         
-        // Check the path structure: should be .../2021/01/Summer 2023/test.jpg
+        // Check the path structure: should be .../2021/Summer 2023/test.jpg
         File albumFolder = resultFile.getParentFile();
-        File monthFolder = albumFolder.getParentFile();
-        File yearFolder = monthFolder.getParentFile();
+        File yearFolder = albumFolder.getParentFile();
         
         assertEquals("Summer 2023", albumFolder.getName(), 
             "Album folder should be named 'Summer 2023'");
-        assertEquals("01", monthFolder.getName(), 
-            "Month folder should be '01'");
         assertEquals("2021", yearFolder.getName(), 
             "Year folder should be '2021'");
     }
@@ -357,17 +354,14 @@ class TakeoutProcessorServiceTest {
 
         File resultFile = service.processMediaFile(fileWithMetadata, options);
 
-        // Check that file is in YYYY/MM/No_Album structure
+        // Check that file is in YYYY/No_Album structure
         assertTrue(resultFile.exists(), "File should be copied");
         
         File albumFolder = resultFile.getParentFile();
-        File monthFolder = albumFolder.getParentFile();
-        File yearFolder = monthFolder.getParentFile();
+        File yearFolder = albumFolder.getParentFile();
         
         assertEquals("No_Album", albumFolder.getName(), 
             "Album folder should be named 'No_Album'");
-        assertEquals("01", monthFolder.getName(), 
-            "Month folder should be '01'");
         assertEquals("2021", yearFolder.getName(), 
             "Year folder should be '2021'");
     }

@@ -67,7 +67,7 @@ public class TakeoutProcessorService {
 		private File outputDirectory;
 		private boolean copyFiles = true; // true = copy, false = move
 		private boolean addMetadata = true;
-		private OrganizationMode organizationMode = OrganizationMode.BY_MONTH;
+		private OrganizationMode organizationMode = OrganizationMode.BY_ALBUM;
 		private boolean skipDuplicates = true; // Skip duplicate files
 		private DuplicateDetector.DuplicateDetectionMode duplicateDetectionMode = DuplicateDetector.DuplicateDetectionMode.HASH;
 
@@ -272,15 +272,14 @@ public class TakeoutProcessorService {
 
 		switch (options.getOrganizationMode()) {
 		case BY_ALBUM:
-			// Organize by album with hierarchical year/month/album structure
+			// Organize by album with hierarchical year/album structure
 			LocalDateTime albumDateTime = extractDateTime(metadata);
 			String album = (albumName != null && !albumName.trim().isEmpty()) ? albumName : "No_Album";
 
 			if (albumDateTime != null) {
-				// Create YYYY/MM/Album folder structure
+				// Create YYYY/Album folder structure
 				String year = String.valueOf(albumDateTime.getYear());
-				String month = String.format("%02d", albumDateTime.getMonthValue());
-				return Paths.get(baseDir.toString(), year, month, album).toFile();
+				return Paths.get(baseDir.toString(), year, album).toFile();
 			} else {
 				// No date available, put in "Unknown_Date/Album" folder
 				return Paths.get(baseDir.toString(), "Unknown_Date", album).toFile();
