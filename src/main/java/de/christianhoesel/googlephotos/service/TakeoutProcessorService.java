@@ -50,6 +50,9 @@ public class TakeoutProcessorService {
 
 	private final MotionPhotoExtractor motionPhotoExtractor = new MotionPhotoExtractor();
 	private final VideoMetadataWriter videoMetadataWriter = new VideoMetadataWriter();
+	
+	// Map to store the earliest date for each album (for BY_ALBUM organization)
+	private java.util.Map<String, LocalDateTime> albumDates = new java.util.HashMap<>();
 
 	/**
 	 * Organization mode for files.
@@ -273,8 +276,16 @@ public class TakeoutProcessorService {
 		switch (options.getOrganizationMode()) {
 		case BY_ALBUM:
 			// Organize by album with hierarchical year/album structure
-			LocalDateTime albumDateTime = extractDateTime(metadata);
 			String album = (albumName != null && !albumName.trim().isEmpty()) ? albumName : "No_Album";
+			
+			// For BY_ALBUM mode, use the album's earliest date instead of individual file date
+			// This ensures all files in the same album go to the same year folder
+			LocalDateTime albumDateTime = albumDates.get(album);
+			
+			// Fall back to individual file date if album date is not available
+			if (albumDateTime == null) {
+				albumDateTime = extractDateTime(metadata);
+			}
 
 			if (albumDateTime != null) {
 				// Create YYYY/Album folder structure
@@ -604,6 +615,42 @@ public class TakeoutProcessorService {
 	}
 
 	/**
+	 * Calculates the earliest capture date for each album.
+	 * This is used for organizing files by album when individual files don't have dates.
+	 */
+	private void calculateAlbumDates(java.util.List<GoogleTakeoutService.MediaFileWithMetadata> files) {
+		albumDates.clear();
+		
+		// Group files by album and find the earliest date for each album
+		java.util.Map<String, java.util.List<LocalDateTime>> albumDateLists = new java.util.HashMap<>();
+		
+		for (GoogleTakeoutService.MediaFileWithMetadata file : files) {
+			String albumName = file.getAlbumName();
+			if (albumName == null || albumName.trim().isEmpty()) {
+				albumName = "No_Album";
+			}
+			
+			LocalDateTime dateTime = extractDateTime(file.getMetadata());
+			if (dateTime != null) {
+				albumDateLists.computeIfAbsent(albumName, k -> new java.util.ArrayList<>()).add(dateTime);
+			}
+		}
+		
+		// For each album, store the earliest (first) date
+		for (java.util.Map.Entry<String, java.util.List<LocalDateTime>> entry : albumDateLists.entrySet()) {
+			java.util.List<LocalDateTime> dates = entry.getValue();
+			if (!dates.isEmpty()) {
+				// Sort to find the earliest date
+				dates.sort(java.util.Comparator.naturalOrder());
+				albumDates.put(entry.getKey(), dates.get(0));
+				logger.debug("Album '{}' earliest date: {}", entry.getKey(), dates.get(0));
+			}
+		}
+		
+		logger.info("Calculated dates for {} albums", albumDates.size());
+	}
+
+	/**
 	 * Processes all files in a list.
 	 */
 	public void processAllFiles(java.util.List<GoogleTakeoutService.MediaFileWithMetadata> files,
@@ -611,6 +658,11 @@ public class TakeoutProcessorService {
 		successCount.set(0);
 		errorCount.set(0);
 		skippedCount.set(0);
+
+		// Calculate album dates for BY_ALBUM organization mode
+		if (options.getOrganizationMode() == OrganizationMode.BY_ALBUM) {
+			calculateAlbumDates(files);
+		}
 
 		// Initialize duplicate detector if enabled
 		DuplicateDetector duplicateDetector = null;
