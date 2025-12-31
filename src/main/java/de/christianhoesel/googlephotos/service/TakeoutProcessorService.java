@@ -7,6 +7,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -278,10 +280,10 @@ public class TakeoutProcessorService {
 				// Create YYYY/MM/Album folder structure
 				String year = String.valueOf(albumDateTime.getYear());
 				String month = String.format("%02d", albumDateTime.getMonthValue());
-				return new File(new File(new File(baseDir, year), month), album);
+				return Paths.get(baseDir.toString(), year, month, album).toFile();
 			} else {
 				// No date available, put in "Unknown_Date/Album" folder
-				return new File(new File(baseDir, "Unknown_Date"), album);
+				return Paths.get(baseDir.toString(), "Unknown_Date", album).toFile();
 			}
 
 		case BY_MONTH:
@@ -291,7 +293,7 @@ public class TakeoutProcessorService {
 				// Create YYYY/MM folder structure
 				String year = String.valueOf(dateTime.getYear());
 				String month = String.format("%02d", dateTime.getMonthValue());
-				return new File(new File(baseDir, year), month);
+				return Paths.get(baseDir.toString(), year, month).toFile();
 			} else {
 				// No date available, put in "Unknown_Date" folder
 				return new File(baseDir, "Unknown_Date");
