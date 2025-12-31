@@ -320,7 +320,7 @@ public class TakeoutProcessorApp extends Application {
 
         RadioButton organizeByAlbumRadio = new RadioButton("Nach Album");
         organizeByAlbumRadio.setToggleGroup(organizationGroup);
-        organizeByAlbumRadio.setTooltip(new Tooltip("Dateien nach Album-Namen aus Ordnerstruktur sortieren"));
+        organizeByAlbumRadio.setTooltip(new Tooltip("Dateien in Jahr/Monat/Album Hierarchie sortieren"));
 
         RadioButton organizeFlatRadio = new RadioButton("Flach (keine Unterordner)");
         organizeFlatRadio.setToggleGroup(organizationGroup);
@@ -649,16 +649,22 @@ public class TakeoutProcessorApp extends Application {
                    12/  (Dezember 2022)
                  Unknown_Date/  (Dateien ohne Datum)
 
-               Nach Album (mit Datum-Präfix):
+               Nach Album (Jahr/Monat/Album):
                <Ausgabeverzeichnis>/
-                 2023-07 Sommerurlaub/
-                 2023-12 Familienfotos/
-                 2024-03 Geburtstag 2023/
-                 No_Album/  (Dateien ohne Album und Datum)
+                 2023/
+                   07/
+                     Sommerurlaub/
+                     Familienfotos/
+                   12/
+                     Geburtstag 2023/
+                     No_Album/  (Dateien ohne Album)
+                 Unknown_Date/  (Dateien ohne Datum)
+                   MeinAlbum/
+                   No_Album/
 
-               Hinweis: Bei "Nach Album" wird das Aufnahmedatum (YYYY-MM)
-               vor den Albumnamen gesetzt, um eine chronologische Sortierung
-               zu ermöglichen.
+               Hinweis: Bei "Nach Album" wird eine hierarchische Struktur
+               Jahr/Monat/Album erstellt. Dateien ohne Datum werden in
+               "Unknown_Date" organisiert.
 
                Flach (keine Unterordner):
                <Ausgabeverzeichnis>/

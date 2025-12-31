@@ -196,14 +196,20 @@ Ausgabeverzeichnis/
 
 ```
 Ausgabeverzeichnis/
-├── Sommerurlaub/
-│   ├── IMG_001.jpg
-│   └── IMG_001.jpg.json
-├── Familienfotos/
-│   ├── IMG_002.jpg
-│   └── IMG_002.jpg.json
-└── No_Album/        (Dateien ohne Album)
-    └── ...
+├── 2023/
+│   ├── 07/
+│   │   ├── Sommerurlaub/
+│   │   │   ├── IMG_001.jpg
+│   │   │   └── IMG_001.jpg.json
+│   │   └── Familienfotos/
+│   │       ├── IMG_002.jpg
+│   │       └── IMG_002.jpg.json
+│   └── 12/
+│       └── No_Album/    (Dateien ohne Album)
+│           └── ...
+└── Unknown_Date/        (Dateien ohne Datum)
+    ├── MeinAlbum/
+    └── No_Album/
 ```
 
 ### Flach
