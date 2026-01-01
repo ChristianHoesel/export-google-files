@@ -309,13 +309,129 @@ class TakeoutProcessorServiceTest {
 
         File resultFile = service.processMediaFile(fileWithMetadata, options);
 
-        // Check that file is in album folder with date prefix (YYYY-MM AlbumName)
-        String folderName = resultFile.getParentFile().getName();
-        assertTrue(folderName.startsWith("2021-01"), 
-            "Folder should start with YYYY-MM date prefix");
-        assertTrue(folderName.contains("Summer 2023"), 
-            "Folder should contain album name");
+        // Check that file is in hierarchical folder structure (YYYY/AlbumName)
         assertTrue(resultFile.exists(), "File should be copied");
+        
+        // Check the path structure: should be .../2021/Summer 2023/test.jpg
+        File albumFolder = resultFile.getParentFile();
+        File yearFolder = albumFolder.getParentFile();
+        
+        assertEquals("Summer 2023", albumFolder.getName(), 
+            "Album folder should be named 'Summer 2023'");
+        assertEquals("2021", yearFolder.getName(), 
+            "Year folder should be '2021'");
+    }
+    
+    @Test
+    void testOrganizeByAlbumModeNoAlbum(@TempDir Path tempDir) throws Exception {
+        // Test case: With date, without album -> should be in YYYY/MM/No_Album
+        File sourceImage = tempDir.resolve("test.jpg").toFile();
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpg", sourceImage);
+
+        GoogleTakeoutMetadata metadata = new GoogleTakeoutMetadata();
+        GoogleTakeoutMetadata.TimeInfo timeInfo = new GoogleTakeoutMetadata.TimeInfo();
+        timeInfo.setTimestamp("1609459200"); // Jan 1, 2021
+        metadata.setPhotoTakenTime(timeInfo);
+
+        File jsonFile = tempDir.resolve("test.jpg.json").toFile();
+        try (FileWriter writer = new FileWriter(jsonFile)) {
+            gson.toJson(metadata, writer);
+        }
+
+        GoogleTakeoutService.MediaFileWithMetadata fileWithMetadata = 
+            new GoogleTakeoutService.MediaFileWithMetadata(sourceImage, jsonFile, metadata, null);
+
+        File outputDir = tempDir.resolve("output").toFile();
+        outputDir.mkdirs();
+        
+        TakeoutProcessorService.ProcessingOptions options = 
+            new TakeoutProcessorService.ProcessingOptions();
+        options.setOutputDirectory(outputDir);
+        options.setOrganizationMode(TakeoutProcessorService.OrganizationMode.BY_ALBUM);
+        options.setAddMetadata(false);
+        options.setCopyFiles(true);
+
+        File resultFile = service.processMediaFile(fileWithMetadata, options);
+
+        // Check that file is in YYYY/No_Album structure
+        assertTrue(resultFile.exists(), "File should be copied");
+        
+        File albumFolder = resultFile.getParentFile();
+        File yearFolder = albumFolder.getParentFile();
+        
+        assertEquals("No_Album", albumFolder.getName(), 
+            "Album folder should be named 'No_Album'");
+        assertEquals("2021", yearFolder.getName(), 
+            "Year folder should be '2021'");
+    }
+    
+    @Test
+    void testOrganizeByAlbumModeNoDate(@TempDir Path tempDir) throws Exception {
+        // Test case: Without date, with album -> should be in Unknown_Date/AlbumName
+        File sourceImage = tempDir.resolve("test.jpg").toFile();
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpg", sourceImage);
+
+        GoogleTakeoutService.MediaFileWithMetadata fileWithMetadata = 
+            new GoogleTakeoutService.MediaFileWithMetadata(sourceImage, null, null, "Vacation Photos");
+
+        File outputDir = tempDir.resolve("output").toFile();
+        outputDir.mkdirs();
+        
+        TakeoutProcessorService.ProcessingOptions options = 
+            new TakeoutProcessorService.ProcessingOptions();
+        options.setOutputDirectory(outputDir);
+        options.setOrganizationMode(TakeoutProcessorService.OrganizationMode.BY_ALBUM);
+        options.setAddMetadata(false);
+        options.setCopyFiles(true);
+
+        File resultFile = service.processMediaFile(fileWithMetadata, options);
+
+        // Check that file is in Unknown_Date/AlbumName structure
+        assertTrue(resultFile.exists(), "File should be copied");
+        
+        File albumFolder = resultFile.getParentFile();
+        File unknownDateFolder = albumFolder.getParentFile();
+        
+        assertEquals("Vacation Photos", albumFolder.getName(), 
+            "Album folder should be named 'Vacation Photos'");
+        assertEquals("Unknown_Date", unknownDateFolder.getName(), 
+            "Parent folder should be 'Unknown_Date'");
+    }
+    
+    @Test
+    void testOrganizeByAlbumModeNoDateNoAlbum(@TempDir Path tempDir) throws Exception {
+        // Test case: Without date, without album -> should be in Unknown_Date/No_Album
+        File sourceImage = tempDir.resolve("test.jpg").toFile();
+        BufferedImage img = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
+        ImageIO.write(img, "jpg", sourceImage);
+
+        GoogleTakeoutService.MediaFileWithMetadata fileWithMetadata = 
+            new GoogleTakeoutService.MediaFileWithMetadata(sourceImage, null, null, null);
+
+        File outputDir = tempDir.resolve("output").toFile();
+        outputDir.mkdirs();
+        
+        TakeoutProcessorService.ProcessingOptions options = 
+            new TakeoutProcessorService.ProcessingOptions();
+        options.setOutputDirectory(outputDir);
+        options.setOrganizationMode(TakeoutProcessorService.OrganizationMode.BY_ALBUM);
+        options.setAddMetadata(false);
+        options.setCopyFiles(true);
+
+        File resultFile = service.processMediaFile(fileWithMetadata, options);
+
+        // Check that file is in Unknown_Date/No_Album structure
+        assertTrue(resultFile.exists(), "File should be copied");
+        
+        File albumFolder = resultFile.getParentFile();
+        File unknownDateFolder = albumFolder.getParentFile();
+        
+        assertEquals("No_Album", albumFolder.getName(), 
+            "Album folder should be named 'No_Album'");
+        assertEquals("Unknown_Date", unknownDateFolder.getName(), 
+            "Parent folder should be 'Unknown_Date'");
     }
     
     @Test
